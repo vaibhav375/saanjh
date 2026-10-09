@@ -146,3 +146,25 @@ fires the count misses (N1, N2), ranking them by downwind harm (N3), and explain
 near the fires (N4). Its alerts should say "farm smoke is heading to your town tonight", alongside the station
 reading, not promise to beat a persistence forecast of a bad morning. Next step: warn only when predicted
 farm smoke is a large share of the expected level, and test that.
+
+## Detector v3: scan-local noise (the fix for the October 2025 false alarms)
+
+Diagnosis: the morning-scan noise estimate sat at its 0.3 K floor for 95–98% of plains pixels, so z was in effect
+a fixed 2 K threshold; on hot, patchy afternoons ordinary surface heating crossed it (7,787 detections on
+20 Oct 2025). A 10-minute persistence rule did not help (those pixels persist; it halved detection instead).
+Fix: divide by max(morning noise, the current scan's robust spread of the dT excess in an 11×11 window), the
+MODIS background-statistics approach; threshold re-tuned on 2024 only (z = 4), then frozen.
+
+| Season | Unmatched detections, v2 → v3 | POD 20–40 MW, v2 → v3 | POD 40–80 MW, v2 → v3 |
+| --- | --- | --- | --- |
+| 2024 (tuning, 43 days) | 29% → **17%** | 0.26 → 0.27 | 0.43 → 0.44 |
+| 2025 (held out, 46 days) | 53% → **30%** | 0.24 → 0.24 | 0.43 → 0.43 |
+
+Season totals with v3 (supersede the v2 numbers above):
+
+| Season | Fire events | Fire energy | PM2.5 (from detected energy) | Energy from fires started after the overpass |
+| --- | --- | --- | --- | --- |
+| 2024 | 27,235 | 657 TJ | 1,514 t | **86.8%** |
+| 2025 (held out) | 29,333 | 729 TJ | 1,679 t | **91.7%** |
+
+The earlier "2025 energy 39% above 2024" was inflated by the false alarms; with v3 it is +11%, too small to claim.
