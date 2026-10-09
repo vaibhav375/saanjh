@@ -168,3 +168,33 @@ Season totals with v3 (supersede the v2 numbers above):
 | 2025 (held out) | 29,333 | 729 TJ | 1,679 t | **91.7%** |
 
 The earlier "2025 energy 39% above 2024" was inflated by the false alarms; with v3 it is +11%, too small to claim.
+
+## N3 with height-aware winds (smoke in shallow night layers moves with 10 m winds)
+
+Pooled 17:00/13:00 exposure ratio, 47 days of 2024: **2.8×** at a 200 m floor (was 2.9×), **1.9×** at 400 m
+(unchanged); daily minimum 1.48× and 1.41×, so evening burning is worse on all 47 days. The result does not
+depend on which wind level carries the smoke.
+
+## N4 and N5 after the improvements (detector v3, height-aware winds, hybrid inventory)
+
+Inventory C ("hybrid") = the overpass inventory A plus only the GK-2A fires it missed: how Saanjh would be added
+to an existing forecast. Daily-anomaly correlation with measured PM2.5, 2025 held out, bootstrap over days:
+
+| Stations | Period | r overpass (A) | r GK-2A only (B) | r hybrid (C) | Gain C − A [95% CI] |
+| --- | --- | --- | --- | --- | --- |
+| Punjab/Haryana/W-UP (33) | season | 0.23 | 0.27 | **0.28** | **+0.06 [+0.02, +0.10]** |
+| Punjab/Haryana/W-UP | Nov | 0.20 | 0.28 | 0.28 | **+0.08 [+0.02, +0.14]** |
+| All (82) | Oct | 0.14 | 0.22 | 0.24 | **+0.10 [+0.03, +0.16]** |
+| All (82) | season | 0.29 | 0.30 | 0.33 | +0.04 [−0.01, +0.09] |
+| Delhi-NCR (49) | season | 0.37 | 0.34 | 0.37 | 0.00 [−0.06, +0.07] |
+
+Adding the missed fires to today's inventory improves day-to-day PM2.5 tracking near the fires over the whole
+season (CI excludes zero), and never hurts in Delhi. GK-2A alone is not better than the hybrid: the overpass
+inventory still carries the small fires GK-2A cannot see, so the two satellites complement each other.
+
+Alerts (Heidke skill, top-third mornings): persistence 0.370; persistence + hybrid smoke 0.375 (all days),
+0.323 vs 0.328 (November). A +0.005 gain is within noise: N5 stays negative.
+
+Tried and rejected: a 10-minute persistence rule (halved detection, no precision gain); a fitted MOS combination
+(unstable: early-October smoke is near zero at many stations, so its October-based standardisation blew up in
+November).

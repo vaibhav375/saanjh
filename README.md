@@ -25,11 +25,11 @@ system that study calls for:
 | Fire energy missed by the overpass, whole 2024 season | **86.8%** of 657 TJ detected (27,235 fire events, 15 Oct–30 Nov, every 10-minute image, replayed on AWS) |
 | Fire energy missed by the overpass, 18 Nov 2024 | **87%** of the fire energy GK-2A detected came from fires not yet burning when VIIRS passed |
 | Strong hotspots, same day | **2** at the 13:40 IST overpass vs **70–78** at 16:00–16:30 IST |
-| The dusk penalty, 47 days | The same fire lit at 17:00 instead of 13:00 causes **2.9×** the population smoke exposure (200 m plume floor; 1.9× at 400 m), and is worse on all 47 days |
+| The dusk penalty, 47 days | The same fire lit at 17:00 instead of 13:00 causes **2.8×** the population smoke exposure (200 m plume floor; 1.9× at 400 m), and is worse on all 47 days |
 | Fire energy missed by the overpass, 2025 (held out) | **91.7%** of 729 TJ detected, with the detector frozen on 2024 |
-| Does it explain measured pollution? (2025, 82 CPCB stations) | Adding the missed fires raises the daily correlation with PM2.5 near the fires from 0.21 to 0.29 in November (+0.08, 95% CI +0.01 to +0.16); no change in Delhi |
+| Does it explain measured pollution? (2025 held out, CPCB stations) | Adding the missed fires to the existing overpass inventory raises the season's daily correlation with PM2.5 near the fires from 0.23 to 0.28 (+0.06, 95% CI +0.02 to +0.10); no change in Delhi |
 | GK-2A detection vs VIIRS at overpass, 2025 held out | 3% of fires under 5 MW, 24% at 20–40 MW, 43% at 40–80 MW (same curve as 2024); 70% of detections have a VIIRS fire within one pixel |
-| Does a night-before smoke warning beat "tomorrow will be like today"? | **No.** Over 3,400 station-mornings, persistence (skill 0.37) beats the smoke forecast (0.23), and adding smoke to it does not help. We report it; see results/NOTES.md |
+| Does a night-before smoke warning beat "tomorrow will be like today"? | **Not meaningfully.** Persistence scores 0.370; persistence + Saanjh smoke 0.375. We report it; see results/NOTES.md |
 
 GK-2A sees Punjab from 66° off vertical, so its pixels are ~4 km and small fires are invisible to it.
 We report that limit rather than hide it.
