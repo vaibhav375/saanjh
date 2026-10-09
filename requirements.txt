@@ -1,0 +1,11 @@
+numpy
+scipy
+pandas
+h5py
+fsspec
+aiohttp
+certifi
+pyproj
+matplotlib
+requests
+pytest
