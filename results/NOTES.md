@@ -35,3 +35,10 @@ heights, and is never better at any floor tested. Mechanism: the afternoon bound
 trapped near the ground overnight while afternoon smoke stays diluted in the residual layer.
 Caveats: no Pakistan population (receptors east of the border dominate under NW winds); no chemistry;
 uniform mixing within H_p.
+
+## End-to-end evening, 18 Nov 2024 (hourly scans 12:00–21:00 IST)
+
+500 GK-2A fire events in Punjab/Haryana. First-seen times peak at 16:00 IST (237 events); 98% of fire
+energy is in events first seen at or after 14:00 IST. Only 50 events were already burning at the VIIRS
+overpass with VIIRS fire in the pixel: **87% of the day's detected fire energy was uncounted.**
+Smoke arrives at Fazilka/Muktsar 17–18 IST, Sangrur 23 IST, Sirsa 01 IST, Noida/Ghaziabad 04–07 IST next day.
