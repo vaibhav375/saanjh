@@ -11,5 +11,7 @@ cp data/pop/pop_grid.npy build/app/saanjh/assets/pop/
   --implementation cp --python-version 3.12 --only-binary=:all: \
   numpy scipy pandas h5py fsspec aiohttp certifi requests
 # boto3 ships with the runtime; trim what Lambda never imports.
-find build/layer -type d \( -name tests -o -name __pycache__ \) -prune -exec rm -rf {} +
+# numpy 2.x imports from numpy/_core/tests at runtime, so its tests stay.
+find build/layer -type d -name __pycache__ -prune -exec rm -rf {} +
+find build/layer -type d -name tests -not -path "*/numpy/*" -prune -exec rm -rf {} +
 du -sh build/app build/layer
