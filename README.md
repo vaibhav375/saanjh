@@ -29,6 +29,7 @@ system that study calls for:
 | Fire energy missed by the overpass, 2025 (held out) | **95.1%** of 1,510 TJ detected, with the detector frozen on 2024 |
 | Does it explain measured pollution? (2025, 82 CPCB stations) | Adding the missed fires raises the daily correlation with PM2.5 near the fires from 0.21 to 0.29 in November (+0.08, 95% CI +0.01 to +0.16); no change in Delhi |
 | GK-2A detection vs VIIRS at overpass, 2025 held out | 3% of fires under 5 MW, 24% at 20–40 MW, 43% at 40–80 MW; same curve as 2024 |
+| Does a night-before smoke warning beat "tomorrow will be like today"? | **No.** Over 3,400 station-mornings, persistence (skill 0.37) beats the smoke forecast (0.23), and adding smoke to it does not help. We report it; see results/NOTES.md |
 
 GK-2A sees Punjab from 66° off vertical, so its pixels are ~4 km and small fires are invisible to it.
 We report that limit rather than hide it.

@@ -121,3 +121,28 @@ sources dominate and both inventories share the same transport. At the hourly sc
 much (R² < 0.04 after removing each station's diurnal cycle), so Saanjh's alerts are about which nights and
 which towns, not exact hours. (First run had a bug: OpenAQ stamps hourly means at xx:30 UTC; fixed by using
 the hour midpoint.)
+
+## N5: the alert replay, 2025 held out (`scripts/alert_replay.py 2025`) — a negative result
+
+Question: would a warning decided at 21:30 IST from that day's fires have picked the mornings (06–10 IST) whose
+measured PM2.5 was in a station's worst third? Each method warns on its own top third of mornings per station.
+ERA5 weather (perfect-weather replay). 82 stations, ~3,400 station-mornings.
+
+| Method | Hit rate | False-alarm ratio | Heidke skill |
+| --- | --- | --- | --- |
+| Saanjh smoke forecast | 0.60 | 0.54 | 0.23 |
+| Overpass-inventory smoke forecast | 0.55 | 0.52 | 0.24 |
+| Persistence (this morning was bad → tomorrow will be) | 0.59 | 0.42 | **0.37** |
+| Persistence + Saanjh (equal-weight ranks) | 0.58 | 0.42 | 0.35 |
+| Persistence + overpass | 0.57 | 0.43 | 0.35 |
+
+Persistence beats both smoke forecasts, and adding modelled smoke to it does not help (Saanjh vs overpass on
+top of persistence: +0.001, 95% CI [−0.07, +0.08]). Exploratory split by the regions defined for N4: same
+picture; near the fires Saanjh has the highest hit rate (0.69) but more false alarms.
+
+Reading: polluted mornings come in multi-day stagnation spells that persistence captures; farm smoke is one
+contributor among many, and the model's hourly skill is low (N4). Saanjh's demonstrated value is in seeing the
+fires the count misses (N1, N2), ranking them by downwind harm (N3), and explaining more of the day-to-day PM2.5
+near the fires (N4). Its alerts should say "farm smoke is heading to your town tonight", alongside the station
+reading, not promise to beat a persistence forecast of a bad morning. Next step: warn only when predicted
+farm smoke is a large share of the expected level, and test that.
