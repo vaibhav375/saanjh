@@ -25,7 +25,7 @@ system that study calls for:
 | Fire energy missed by the overpass, whole 2024 season | **90.8%** of 1,092 TJ detected (45,342 fire events, 15 Oct–30 Nov, every 10-minute image, replayed on AWS) |
 | Fire energy missed by the overpass, 18 Nov 2024 | **87%** of the fire energy GK-2A detected came from fires not yet burning when VIIRS passed |
 | Strong hotspots, same day | **2** at the 13:40 IST overpass vs **70–78** at 16:00–16:30 IST |
-| The dusk penalty | The same fire lit at 17:00 instead of 13:00 causes **2–4×** the population smoke exposure (3.2× at a 200 m plume floor; 1.3× even at 800 m) |
+| The dusk penalty, 47 days | The same fire lit at 17:00 instead of 13:00 causes **2.9×** the population smoke exposure (200 m plume floor; 1.9× at 400 m), and is worse on all 47 days |
 | GK-2A detection vs VIIRS at overpass (10 days) | 4% of fires under 5 MW, 32% at 20–40 MW, 51% at 40–80 MW; 79% of detections have a VIIRS fire within one pixel |
 
 GK-2A sees Punjab from 66° off vertical, so its pixels are ~4 km and small fires are invisible to it.

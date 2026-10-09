@@ -59,3 +59,25 @@ Step Functions → 47 parallel day runs of the same Lambdas that serve the live 
 Caveats: the share is of energy GK-2A can see, which favours larger fires; midday detection is harder than
 evening (solar heating), which can push the share up. The 18:00 dip is likely the sunset threshold change
 in the detector, not a real lull.
+
+## N3, full season (15 Oct – 30 Nov 2024, 47 days)
+
+`scripts/dusk_penalty.py 2024-10-15 2024-11-30 200 400` → `results/dusk_penalty_20241015_20241130.csv`
+
+| Plume injection floor | Pooled exposure ratio 17:00 / 13:00 | Daily mean | Daily range | Days where dusk is worse |
+| --- | --- | --- | --- | --- |
+| 200 m | **2.9×** | 3.2× | 1.5–5.2× | 47 / 47 |
+| 400 m | **1.9×** | 2.0× | 1.4–2.9× | 47 / 47 |
+
+## Detector revision (tuned on 2024 only, then frozen)
+
+Scoring the whole 2024 season (43 days with VIIRS) showed unmatched detections rising on quiet days, concentrated
+on 20 Oct and 14–15 Nov at 28–29°N (Thar desert edge) with zero 3.8 µm excess: a cold 11.2 µm pixel, not a fire.
+Added the MODIS-style requirement that 3.8 µm itself exceeds its neighbourhood by 0.5 K. Effect on 2024:
+detection by FRP bin unchanged; unmatched detections 46% → ~33% (season) and 21% → 16% (10 peak days).
+Both seasons were re-run in the cloud with the frozen detector; 2025 was never used for tuning.
+
+## Data gap
+
+OpenAQ has no CPCB station data for 2023–2024 (old sensor ids end Oct 2022, new ones start 2025), so the
+PM2.5 tests (N4, N5) use the 2025 season only.

@@ -21,12 +21,13 @@ def api_key():
     raise SystemExit("set OPENAQ_API_KEY")
 
 
-st = pd.read_csv("data/openaq_stations.csv").dropna(subset=["pm25_sensor"])
+st = pd.read_csv("data/openaq_stations.csv", dtype={"pm25_sensor": str}).dropna(subset=["pm25_sensor"])
 a, b = sys.argv[1], sys.argv[2]
 http = requests.Session()
 http.headers["X-API-Key"] = api_key()
 rows = []
-for loc, sensor in zip(st.id, st.pm25_sensor.astype(int)):
+pairs = [(loc, int(s)) for loc, ss in zip(st.id, st.pm25_sensor) for s in ss.split(";")]  # stations have old and new sensor ids
+for loc, sensor in pairs:
     page = 1
     while True:
         for attempt in range(6):
@@ -44,6 +45,6 @@ for loc, sensor in zip(st.id, st.pm25_sensor.astype(int)):
         if len(res) < 1000:
             break
         page += 1
-out = pd.DataFrame(rows, columns=["location_id", "datetime", "value"])
+out = pd.DataFrame(rows, columns=["location_id", "datetime", "value"]).drop_duplicates(["location_id", "datetime"])
 out.to_csv(sys.argv[3], index=False)
 print(len(st), "stations,", out.location_id.nunique(), "with data,", len(out), "hourly values")
