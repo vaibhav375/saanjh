@@ -11,7 +11,7 @@ station (its own top third), so hit rates compare fairly:
   persistence+X  equal-weight average of the two predictors' within-station ranks (nothing fitted)
 Weather is ERA5 (a perfect-weather replay); the live system uses forecasts.
 
-usage: alert_replay.py YEAR    (needs results/ablation_model_<YEAR>.pkl and data/pm25_<YEAR>.csv)
+usage: alert_replay.py YEAR [nov]    (nov = score November only; needs results/ablation_model_<YEAR>.pkl and data/pm25_<YEAR>.csv)
 """
 import sys
 
@@ -39,7 +39,12 @@ pred["persistence"] = o.shift(1)  # yesterday morning's value, known at 21:30 th
 rank = lambda df: df.rank(pct=True)
 pred["persistence+saanjh"] = (rank(pred["persistence"]) + rank(pred["saanjh"].reindex_like(pred["persistence"]))) / 2
 pred["persistence+overpass"] = (rank(pred["persistence"]) + rank(pred["overpass"].reindex_like(pred["persistence"]))) / 2
-days = [d for d in o.index if pd.Timestamp(d).month in (10, 11) and pd.Timestamp(d) >= pd.Timestamp(f"{year}-10-17")]
+if "U" in model:
+    pred["persistence+hybrid"] = (rank(pred["persistence"]) + rank(mornings(model["A"] + model["U"]).reindex_like(pred["persistence"]))) / 2
+
+month = sys.argv[2] if len(sys.argv) > 2 else "all"  # "nov": November only, the MOS test month
+days = [d for d in o.index if pd.Timestamp(d).month in ((11,) if month == "nov" else (10, 11))
+        and pd.Timestamp(d) >= pd.Timestamp(f"{year}-10-17")]
 o = o.loc[days]
 event = o.ge(o.quantile(2 / 3))
 

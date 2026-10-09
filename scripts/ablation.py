@@ -5,6 +5,7 @@ Two emission inventories, same smoke model, same ERA5 weather, 15 Oct - 30 Nov:
   A "overpass":  VIIRS fires at ~13:30, spread over the day with the midday-peaked diurnal profile that
                  operational inventories assume (Gaussian, peak 13:30 IST, sigma 2 h).
   B "saanjh":    GK-2A fire events at the times they were actually seen (10-minute replay on AWS).
+  C "hybrid":    A plus only the GK-2A fires the overpass missed, i.e. Saanjh added to today's inventory.
 Modelled farm smoke is sampled hourly at CPCB stations. Each station's mean diurnal cycle is removed
 from observations and model (so night-time inversions of local pollution do not count as skill),
 skill is the correlation of daily station-mean anomalies, by region and month, with a bootstrap over days.
@@ -29,7 +30,7 @@ iy = ((st.lat - smoke.LAT0) / smoke.D).astype(int).to_numpy()
 ix = ((st.lon - smoke.LON0) / smoke.D).astype(int).to_numpy()
 viirs = pd.read_csv("data/firms/viirs_snpp_punjab_both_2024_2025.csv")
 hours = int((end - start).days * 24 + 48)
-series = {k: np.zeros((hours, len(st))) for k in ("A", "B")}
+series = {k: np.zeros((hours, len(st))) for k in ("A", "B", "U")}
 
 
 def add(name, conc, t0):
@@ -63,6 +64,10 @@ if "--eval" not in sys.argv:
             ev = pipeline.fire_events(d, step_min=10, viirs=v, detections=det)
             _, _, conc, t0 = pipeline.tonight(d, met, ev)
             add("B", conc, t0)
+            missed = ev[~ev.counted]
+            if len(missed):
+                _, _, conc, t0 = pipeline.tonight(d, met, missed)
+                add("U", conc, t0)
         if len(v):
             lat, lon, t, m = overpass_inventory(v, d)
             conc, _ = smoke.run(met, lat, lon, t, m, hours=30, n_per=10)
@@ -94,23 +99,24 @@ def anomalies(df):
 # track the day-to-day PM2.5 measured? Scale-free (Pearson r), with a bootstrap over days for B - A.
 st["region"] = np.where(st.lat.between(28.3, 28.95) & st.lon.between(76.8, 77.55), "Delhi-NCR", "Punjab/Haryana/W-UP")
 daily = {k: (v.resample("D").mean() - v.resample("D").mean().mean()) for k, v in
-         {"obs": obs, "A": model["A"], "B": model["B"]}.items()}
+         {"obs": obs, "A": model["A"], "B": model["B"], "C": model["A"] + model["U"]}.items()}
 rng = np.random.default_rng(0)
 rows = []
 for region in ("Punjab/Haryana/W-UP", "Delhi-NCR", "all"):
     cols = st.id[st.region == region] if region != "all" else st.id
     for month, sel in (("Oct", daily["obs"].index.month == 10), ("Nov", daily["obs"].index.month == 11), ("season", slice(None))):
-        frame = pd.concat({k: daily[k].loc[sel, cols].stack() for k in ("obs", "A", "B")}, axis=1).dropna()
+        frame = pd.concat({k: daily[k].loc[sel, cols].stack() for k in ("obs", "A", "B", "C")}, axis=1).dropna()
         days = frame.index.get_level_values(0).unique()
-        r = {k: frame.obs.corr(frame[k]) for k in ("A", "B")}
-        boot = []
+        r = {k: frame.obs.corr(frame[k]) for k in ("A", "B", "C")}
+        boot = {"B": [], "C": []}
         for _ in range(500):
             pick = frame.loc[rng.choice(days, len(days))]
-            boot.append(pick.obs.corr(pick.B) - pick.obs.corr(pick.A))
-        lo, hi = np.percentile(boot, [2.5, 97.5])
+            for k in boot:
+                boot[k].append(pick.obs.corr(pick[k]) - pick.obs.corr(pick.A))
+        ci = {k: "[%+.2f, %+.2f]" % tuple(np.percentile(v, [2.5, 97.5])) for k, v in boot.items()}
         rows.append(dict(region=region, period=month, stations=frame.index.get_level_values(1).nunique(),
-                         station_days=len(frame), r_overpass=r["A"], r_saanjh=r["B"], gain=r["B"] - r["A"],
-                         gain_ci95=f"[{lo:+.2f}, {hi:+.2f}]"))
+                         r_overpass=r["A"], r_saanjh=r["B"], r_hybrid=r["C"],
+                         gain_saanjh=r["B"] - r["A"], ci_saanjh=ci["B"], gain_hybrid=r["C"] - r["A"], ci_hybrid=ci["C"]))
 res = pd.DataFrame(rows)
 res.to_csv(f"results/ablation_{year}.csv", index=False)
 print(res.round(3).to_string(index=False))

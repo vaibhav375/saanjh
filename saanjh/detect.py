@@ -17,13 +17,22 @@ from scipy import ndimage
 # BT11.2 cloud floor (K) by IST hour; daytime values from Jethva 2026 Table 1, evening extrapolated.
 F112 = {12: 293, 13: 293, 14: 293, 15: 289, 16: 289, 17: 288, 18: 287, 19: 283, 20: 282, 21: 281,
         22: 280, 23: 279}
-Z, MIN_EXCESS_K, MIN_MIR_K, MAX_ELEV_M = 6.0, 2.0, 0.5, 400.0
+Z, MIN_EXCESS_K, MIN_MIR_K, MAX_ELEV_M = 4.0, 2.0, 0.5, 400.0  # Z tuned on 2024 with scan-local noise
 
 
 def excess(x, size=7):
     """x minus its size x size neighbourhood median (NaNs filled with the scene median)."""
     filled = np.where(np.isfinite(x), x, np.nanmedian(x))
     return x - ndimage.median_filter(filled, size)
+
+
+def local_noise(dt, c, size=11):
+    """Robust spread (1.4826 * MAD) of the dT excess in the size x size window around each pixel, from the
+    current scan. Morning scans are quiet, so the morning noise sits at its floor for ~95% of pixels and
+    under-states the afternoon's patchy solar heating; this lets the threshold rise on hot afternoons
+    (MODIS-style background statistics)."""
+    filled = np.where(np.isfinite(c), np.abs(c), 0.0)
+    return 1.4826 * ndimage.median_filter(filled, size)
 
 
 def baseline(morning):
@@ -38,8 +47,9 @@ def baseline(morning):
 def detect(bt38, bt112, base, ist_hour, elev, z_thr=Z):
     """Returns (fire mask, z score) for one scan."""
     bias, noise = base
-    c = excess(bt38 - bt112)
-    z = (c - bias) / noise
+    dt = bt38 - bt112
+    c = excess(dt)
+    z = (c - bias) / np.maximum(noise, local_noise(dt, c))
     floor = F112[ist_hour]
     with np.errstate(invalid="ignore"):
         clear = (bt112 > floor) & (ndimage.minimum_filter(np.nan_to_num(bt112), 5) > floor - 4)

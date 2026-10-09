@@ -24,6 +24,7 @@ from saanjh import detect, gk2a
 viirs = pd.read_csv(sys.argv[1])
 out = sys.argv[2]
 CLOUD = "--cloud" in sys.argv
+DET_DIR = os.environ.get("DET_DIR", "data/detections")
 z_list = [float(z) for z in sys.argv[3:] if z != "--cloud"] or [detect.Z]
 lat, lon = gk2a.crop_grid()
 elev = np.load("data/elevation_crop.npy")
@@ -38,7 +39,7 @@ for day_s, v in viirs.groupby("acq_date"):
     morning = [day + timedelta(hours=3, minutes=30 + 30 * i) for i in range(5)]
     pair = [t0, t0 + timedelta(minutes=10)]
     if CLOUD:
-        paths = [f"data/detections/{t:%Y%m%d}/{t:%H%M}.csv" for t in pair]
+        paths = [f"{DET_DIR}/{t:%Y%m%d}/{t:%H%M}.csv" for t in pair]
         if not all(os.path.exists(p) for p in paths):
             continue
         cloud_det = np.zeros(lat.shape, bool)

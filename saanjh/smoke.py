@@ -1,6 +1,7 @@
 """Lagrangian smoke model: fire emissions -> ground-level PM2.5 -> population exposure.
 
-Particles move with ERA5 100 m winds (RK2) plus a horizontal random walk. Each particle is mixed
+Particles move with ERA5 winds blended from 10 m to 100 m by their mixing depth (RK2), plus a horizontal
+random walk. Each particle is mixed
 evenly from the ground up to H_p, the deepest boundary layer it has been in since release
 (floored at the plume injection depth). That is the residual-layer rule: smoke released into a deep
 afternoon layer stays diluted aloft when the layer collapses at dusk, while smoke released into the
@@ -56,21 +57,29 @@ def population():
 class Met:
     """Hourly u, v (m/s, 100 m) and boundary-layer height (m) on a 0.5 deg grid."""
 
-    def __init__(self, t0: datetime, hours, lats, lons, u, v, blh):
+    def __init__(self, t0: datetime, hours, lats, lons, u, v, blh, u10=None, v10=None):
         self.t0, self.hours = t0, hours
         axes = (np.arange(hours, dtype=float), lats, lons)
         kw = dict(bounds_error=False, fill_value=None)
         self.u, self.v, self.blh = (RegularGridInterpolator(axes, a, **kw) for a in (u, v, blh))
+        self.u10, self.v10 = ((RegularGridInterpolator(axes, a, **kw) for a in (u10, v10))
+                              if u10 is not None else (self.u, self.v))
 
-    def at(self, t_h, lat, lon):
+    def at(self, t_h, lat, lon, depth=None):
+        """Wind and boundary-layer height. With `depth` (m, each particle's mixing depth), the wind is
+        blended from 10 m (shallow night layers) to 100 m (layers deeper than 300 m)."""
         p = np.c_[np.clip(t_h, 0, self.hours - 1), lat, lon]
-        return self.u(p), self.v(p), np.maximum(self.blh(p), 10.0)
+        u, v = self.u(p), self.v(p)
+        if depth is not None:
+            w = np.clip((depth - 50.0) / 250.0, 0, 1)
+            u, v = w * u + (1 - w) * self.u10(p), w * v + (1 - w) * self.v10(p)
+        return u, v, np.maximum(self.blh(p), 10.0)
 
     @classmethod
     def era5(cls, start: datetime, end: datetime, forecast=False):
         """Hourly fields for [start, end] (UTC dates) via Open-Meteo, cached: ERA5 reanalysis for
         replays, or the live forecast (which serves recent past days too) when forecast=True."""
-        kind = "fcst" if forecast else "era5"
+        kind = "fcst2" if forecast else "era5w"  # w: with 10 m winds
         path = os.path.join(DATA, "met", f"{kind}_{start:%Y%m%d}_{end:%Y%m%d}.npz")
         api = ("https://api.open-meteo.com/v1/forecast" if forecast
                else "https://archive-api.open-meteo.com/v1/era5")
@@ -86,7 +95,7 @@ class Met:
                         latitude=",".join(f"{x:.2f}" for x in q[:, 0]),
                         longitude=",".join(f"{x:.2f}" for x in q[:, 1]),
                         start_date=f"{start:%Y-%m-%d}", end_date=f"{end:%Y-%m-%d}", timezone="GMT",
-                        hourly="wind_speed_100m,wind_direction_100m,boundary_layer_height",
+                        hourly="wind_speed_100m,wind_direction_100m,wind_speed_10m,wind_direction_10m,boundary_layer_height",
                         wind_speed_unit="ms"))
                     if r.ok:
                         break
@@ -98,15 +107,20 @@ class Met:
             ws = np.array([c["hourly"]["wind_speed_100m"] for c in cols], float)
             wd = np.radians(np.array([c["hourly"]["wind_direction_100m"] for c in cols], float))
             blh = np.array([c["hourly"]["boundary_layer_height"] for c in cols], float)
+            ws10 = np.array([c["hourly"]["wind_speed_10m"] for c in cols], float)
+            wd10 = np.radians(np.array([c["hourly"]["wind_direction_10m"] for c in cols], float))
             shape = (len(lats), len(lons), -1)
             u, v = (-ws * np.sin(wd)).reshape(shape), (-ws * np.cos(wd)).reshape(shape)  # wind FROM wd
+            u10, v10 = (-ws10 * np.sin(wd10)).reshape(shape), (-ws10 * np.cos(wd10)).reshape(shape)
             os.makedirs(os.path.dirname(path), exist_ok=True)
             np.savez_compressed(path, lats=lats, lons=lons, u=u.transpose(2, 0, 1),
                                 v=v.transpose(2, 0, 1), blh=blh.reshape(shape).transpose(2, 0, 1),
+                                u10=u10.transpose(2, 0, 1), v10=v10.transpose(2, 0, 1),
                                 t0=json.dumps(f"{start:%Y-%m-%d}"))
         z = np.load(path)
         t0 = datetime.fromisoformat(json.loads(str(z["t0"])))
-        return cls(t0, z["u"].shape[0], z["lats"], z["lons"], z["u"], z["v"], np.nan_to_num(z["blh"], nan=300.0))
+        return cls(t0, z["u"].shape[0], z["lats"], z["lons"], z["u"], z["v"], np.nan_to_num(z["blh"], nan=300.0),
+                   np.nan_to_num(z["u10"]), np.nan_to_num(z["v10"]))
 
 
 def run(met: Met, lat, lon, t_rel, mass_kg, hours=36, n_per=40, dt_min=15, seed=0,
@@ -144,10 +158,10 @@ def run(met: Met, lat, lon, t_rel, mass_kg, hours=36, n_per=40, dt_min=15, seed=
         if not live.any():
             continue
         la, lo = plat[live], plon[live]
-        u1, v1, _ = met.at(np.full(la.shape, t), la, lo)
+        u1, v1, _ = met.at(np.full(la.shape, t), la, lo, hp[live])
         lam = la + v1 * dt_s / 2 / 110570.0
         lom = lo + u1 * dt_s / 2 / (111320.0 * np.cos(np.radians(la)))
-        u2, v2, _ = met.at(np.full(la.shape, t + dt_h / 2), lam, lom)
+        u2, v2, _ = met.at(np.full(la.shape, t + dt_h / 2), lam, lom, hp[live])
         la = la + (v2 * dt_s + rng.normal(0, sig, la.shape)) / 110570.0
         lo = lo + (u2 * dt_s + rng.normal(0, sig, la.shape)) / (111320.0 * np.cos(np.radians(la)))
         plat[live], plon[live] = la, lo
