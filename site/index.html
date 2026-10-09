@@ -304,7 +304,7 @@ function buildStrip() {
   }
   // where the polar satellites pass
   const pass = Date.parse(S.d.day + "T08:00Z"), kp = (pass - t0) / 3600e3;
-  if (kp >= 0) s += `<line x1="${xk(kp)}" x2="${xk(kp)}" y1="2" y2="${bandY + bandH + 4}" stroke="#D6A93F" stroke-width="1.5" stroke-dasharray="3 3"/><text x="${xk(kp) - 4}" y="10" text-anchor="end" style="fill:#D6A93F">satellites pass ${fmtIST(pass)}</text>`;
+  if (kp >= 0) s += `<line x1="${xk(kp)}" x2="${xk(kp)}" y1="2" y2="${bandY + bandH + 4}" stroke="#D6A93F" stroke-width="1.5" stroke-dasharray="3 3"/><text x="${xk(kp) + 5}" y="10" style="fill:#D6A93F">satellites pass ${fmtIST(pass)}</text>`;
   // hour labels
   for (let k = 0; k < n; k += 3) s += `<text x="${xk(k)}" y="${h - 8}" text-anchor="${k ? "middle" : "start"}">${fmtIST(frameTime(k))}</text>`;
   if (S.town) { const t = S.d.towns.find(t => t.town === S.town); const k = kFromLabel(t.arrives_ist); if (k >= 0) s += `<path d="M${xk(k)} ${bandY + bandH + 2} l-5 8 h10z" fill="#B9A7D6"/><text x="${xk(k) + 8}" y="${bandY + bandH + 10}" style="fill:#B9A7D6">smoke reaches ${S.town}</text>`; }
