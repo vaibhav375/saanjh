@@ -7,7 +7,6 @@ model_handler   {"day": ..., "replay": true} or a scheduled event (live, today i
                 Builds fire events, runs the smoke model, writes site/tonight.json (live) or
                 results/<yyyymmdd>.json (replay), and publishes smoke alerts (live only).
 """
-import base64
 import io
 import json
 import os
@@ -103,14 +102,6 @@ def _viirs(day):
         return None
 
 
-def _frames(conc, factor=2):
-    """Hourly ground-smoke grids, block-averaged to 0.1 deg and log-scaled to uint8, base64."""
-    k, ny, nx = conc.shape
-    c = conc[:, :ny // factor * factor, :nx // factor * factor].reshape(k, ny // factor, factor, nx // factor, factor)
-    q = np.clip(np.log10(np.maximum(c.mean((2, 4)), 1e-3)) * 50 + 150, 0, 255).astype("u1")  # 1e-3..1e2 ug/m3
-    return [base64.b64encode(f.tobytes()).decode() for f in q]
-
-
 def model_handler(event, _ctx=None):
     replay = bool(event.get("replay"))
     now_ist = datetime.now(timezone.utc).replace(tzinfo=None) + pipeline.IST
@@ -122,17 +113,7 @@ def model_handler(event, _ctx=None):
     ev = pipeline.fire_events(day, step_min=step, viirs=_viirs(day), detections=det)
     met = smoke.Met.era5(day - timedelta(days=1), day + timedelta(days=2), forecast=not replay)
     ev, towns, conc, t0 = pipeline.tonight(day, met, ev)
-    out = dict(
-        day=f"{day:%Y-%m-%d}", generated=f"{datetime.now(timezone.utc):%Y-%m-%dT%H:%MZ}", scans=n_scans,
-        stats=dict(events=len(ev), counted=int(ev.counted.sum()),
-                   uncounted_energy_share=round(float(ev.fre_mj[~ev.counted].sum() / ev.fre_mj.sum()), 3),
-                   fre_mj=round(float(ev.fre_mj.sum())), pm25_t=round(float(ev.pm25_kg.sum()) / 1000, 1)),
-        fires=json.loads(ev.head(50)[["lat", "lon", "first_ist", "scans", "frp_peak", "pm25_kg", "counted", "harm"]]
-                         .round(3).to_json(orient="records")),
-        towns=json.loads(towns.round(1).to_json(orient="records")),
-        grid=dict(lat0=smoke.LAT0, lon0=smoke.LON0, d=smoke.D * 2, ny=smoke.NY // 2, nx=smoke.NX // 2,
-                  t0=f"{t0:%Y-%m-%dT%H:%MZ}", scale="ug/m3 = 10**((v-150)/50)"),
-        frames=_frames(conc))
+    out = pipeline.summary(day, ev, towns, conc, t0, n_scans, replay)
     body = json.dumps(out, separators=(",", ":"))
     if replay:
         _put(f"results/{day:%Y%m%d}.json", body)

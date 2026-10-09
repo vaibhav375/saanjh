@@ -1,5 +1,7 @@
 """One evening, end to end: GK-2A scans -> fire events -> smoke -> ranked fires and town alerts."""
-from datetime import datetime, timedelta
+import base64
+import json
+from datetime import datetime, timedelta, timezone
 
 import numpy as np
 import pandas as pd
@@ -17,6 +19,26 @@ TOWNS = {  # name: (lat, lon)
     "Ambala": (30.38, 76.78), "Chandigarh": (30.73, 76.78), "Patiala": (30.34, 76.39), "Sangrur": (30.25, 75.84),
     "Ludhiana": (30.90, 75.85), "Jalandhar": (31.33, 75.58), "Amritsar": (31.63, 74.87), "Moga": (30.82, 75.17),
     "Bathinda": (30.21, 74.95), "Ferozepur": (30.93, 74.61), "Muktsar": (30.47, 74.52), "Fazilka": (30.40, 74.03),
+    "Fatehabad": (29.52, 75.45),
+    "Ratia": (29.69, 75.58),
+    "Tohana": (29.71, 75.9),
+    "Mansa": (29.99, 75.4),
+    "Barnala": (30.38, 75.55),
+    "Kaithal": (29.8, 76.4),
+    "Jind": (29.32, 76.31),
+    "Tarn Taran": (31.45, 74.93),
+    "Kapurthala": (31.38, 75.38),
+    "Faridkot": (30.67, 74.76),
+    "Abohar": (30.14, 74.2),
+    "Malerkotla": (30.53, 75.88),
+    "Gurdaspur": (32.04, 75.4),
+    "Hoshiarpur": (31.53, 75.91),
+    "Rupnagar": (30.97, 76.53),
+    "Kurukshetra": (29.97, 76.85),
+    "Yamunanagar": (30.13, 77.27),
+    "Bhiwani": (28.79, 76.13),
+    "Ellenabad": (29.45, 74.66),
+    "Talwandi Sabo": (29.98, 75.08),
 }
 
 
@@ -101,3 +123,34 @@ def tonight(day, met, events, hours=30):
         towns.append(dict(town=name, peak_ugm3=series.max(), peak_ist=f"{t0 + timedelta(hours=k_peak) + IST:%a %H:%M}",
                           arrives_ist=f"{t0 + timedelta(hours=int(over[0])) + IST:%a %H:%M}" if len(over) else ""))
     return events, pd.DataFrame(towns).sort_values("peak_ugm3", ascending=False), conc, t0
+
+
+def _frames(conc, factor=2):
+    """Hourly ground-smoke grids, block-averaged to 0.1 deg and log-scaled to uint8, base64."""
+    k, ny, nx = conc.shape
+    c = conc[:, :ny // factor * factor, :nx // factor * factor].reshape(k, ny // factor, factor, nx // factor, factor)
+    q = np.clip(np.log10(np.maximum(c.mean((2, 4)), 1e-3)) * 50 + 150, 0, 255).astype("u1")  # 1e-3..1e2 ug/m3
+    return [base64.b64encode(f.tobytes()).decode() for f in q]
+
+
+def summary(day, ev, towns, conc, t0, n_scans, replay=False):
+    """The JSON the web page reads (tonight.json / results/<day>.json)."""
+    near = {}
+    for k, r in ev.head(50).iterrows():
+        name, (la, lo) = min(TOWNS.items(), key=lambda kv: (kv[1][0] - r.lat) ** 2 + (kv[1][1] - r.lon) ** 2)
+        near[k] = f"{name} {np.hypot((la - r.lat) * 111, (lo - r.lon) * 96):.0f} km"
+    fires = ev.head(50).assign(near=pd.Series(near))
+    return dict(
+        day=f"{day:%Y-%m-%d}", generated=f"{datetime.now(timezone.utc):%Y-%m-%dT%H:%MZ}", scans=n_scans, replay=replay,
+        stats=dict(events=len(ev), counted=int(ev.counted.sum()),
+                   uncounted_energy_share=round(float(ev.fre_mj[~ev.counted].sum() / ev.fre_mj.sum()), 3),
+                   fre_mj=round(float(ev.fre_mj.sum())), pm25_t=round(float(ev.pm25_kg.sum()) / 1000, 1),
+                   top20_harm_share=round(float(ev.harm.head(20).sum() / ev.harm.sum()), 3),
+                   harm_total=float(ev.harm.sum()),
+                   first_seen=ev.groupby("first_ist").size().to_dict()),
+        fires=json.loads(fires[["lat", "lon", "near", "first_ist", "scans", "frp_peak", "pm25_kg", "counted", "harm"]]
+                         .round(3).to_json(orient="records")),
+        towns=json.loads(towns.round(1).to_json(orient="records")),
+        grid=dict(lat0=smoke.LAT0, lon0=smoke.LON0, d=smoke.D * 2, ny=smoke.NY // 2, nx=smoke.NX // 2,
+                  t0=f"{t0:%Y-%m-%dT%H:%MZ}", scale="ug/m3 = 10**((v-150)/50)"),
+        frames=_frames(conc))

@@ -1,0 +1,400 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Saanjh · Tonight's farm smoke</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anek+Latin:wdth,wght@75..125,300..800&family=Anek+Gurmukhi:wght@400;600&family=Anek+Devanagari:wght@400;600&family=Mukta:wght@400;500;700&family=Spline+Sans+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --page: #E7E6EA;       /* cool ash */
+  --panel: #F4F3F6;
+  --ink: #1C1B22;
+  --muted: #615E6B;
+  --rule: #CFCDD6;
+  --night: #141A33;      /* map sky */
+  --night-ink: #C9C6DA;
+  --straw: #D6A93F;      /* counted by the polar satellites */
+  --ember: #EE5A24;      /* missed by them */
+  --smoke: #B9A7D6;
+  --alert: #B4231C;
+  --watch: #B9761A;
+  --focus: #3F5BD8;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --page: #111018; --panel: #1A1922; --ink: #ECEAF2; --muted: #A29FB0; --rule: #2E2C39;
+    --alert: #FF6B5E; --watch: #E7A84A; --focus: #8EA2FF;
+  }
+}
+:root[data-theme="dark"] {
+  --page: #111018; --panel: #1A1922; --ink: #ECEAF2; --muted: #A29FB0; --rule: #2E2C39;
+  --alert: #FF6B5E; --watch: #E7A84A; --focus: #8EA2FF;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--page); color: var(--ink); font: 400 16px/1.5 Mukta, system-ui, sans-serif; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.wrap { max-width: 1320px; margin: 0 auto; padding: 20px 16px 48px; }
+
+header { display: grid; gap: 10px; padding: 8px 0 22px; }
+.brand { display: flex; align-items: baseline; gap: 12px; font: 700 15px/1 "Anek Latin"; font-stretch: 112%; letter-spacing: .14em; text-transform: uppercase; }
+.brand .gur { font: 600 17px/1 "Anek Gurmukhi"; letter-spacing: 0; color: var(--muted); text-transform: none; }
+.brand .day { margin-left: auto; font: 400 13px/1 "Spline Sans Mono"; letter-spacing: 0; text-transform: none; color: var(--muted); }
+h1 { margin: 6px 0 0; max-width: 30ch; font: 760 clamp(28px, 3.9vw, 50px)/1.04 "Anek Latin"; font-stretch: 78%; letter-spacing: -.01em; }
+h1 em { font-style: normal; color: var(--ember); }
+.facts { display: flex; flex-wrap: wrap; gap: 6px 22px; font: 400 13px/1.4 "Spline Sans Mono"; color: var(--muted); }
+.facts b { color: var(--ink); font-weight: 500; }
+
+main { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(320px, 1fr); gap: 20px; align-items: start; }
+@media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+
+.mapcard { background: var(--night); border-radius: 14px; overflow: hidden; color: var(--night-ink); }
+.mapbox { position: relative; }
+canvas#map { display: block; width: 100%; height: auto; touch-action: none; }
+.legend { position: absolute; left: 14px; bottom: 12px; display: flex; flex-wrap: wrap; gap: 4px 14px; font: 400 12px/1.3 "Spline Sans Mono"; }
+.legend i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; }
+.clock { position: absolute; right: 14px; top: 10px; text-align: right; }
+.clock .t { font: 700 34px/1 "Anek Latin"; font-stretch: 80%; color: #fff; }
+.clock .d { font: 400 12px/1.4 "Spline Sans Mono"; }
+.tip { position: absolute; pointer-events: none; background: #0B0E1E; color: #fff; padding: 6px 9px; border-radius: 6px; font: 400 12px/1.35 "Spline Sans Mono"; white-space: nowrap; transform: translate(-50%, calc(-100% - 10px)); display: none; }
+
+/* The night strip: the timeline people scrub, painted with the sky it covers. */
+.strip { padding: 12px 14px 14px; border-top: 1px solid #262C4D; }
+.strip-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; font: 400 12px/1.3 "Spline Sans Mono"; }
+.strip-head button { white-space: nowrap; font: 500 12px/1 "Spline Sans Mono"; color: #fff; background: #262C4D; border: 0; border-radius: 999px; padding: 7px 12px; cursor: pointer; }
+.strip-head span { margin-left: auto; opacity: .8; }
+svg#strip { display: block; width: 100%; height: 104px; cursor: ew-resize; }
+svg#strip text { font: 400 10.5px "Spline Sans Mono"; fill: #C9C6DA; }
+
+aside { background: var(--panel); border: 1px solid var(--rule); border-radius: 14px; overflow: hidden; }
+.tabs { display: grid; grid-template-columns: 1fr 1fr; border-bottom: 1px solid var(--rule); }
+.tabs button { font: 600 15px/1.2 "Anek Latin"; font-stretch: 95%; padding: 14px 10px; border: 0; background: transparent; color: var(--muted); cursor: pointer; border-bottom: 3px solid transparent; }
+.tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--ink); }
+.pane { padding: 16px; }
+.pane[hidden] { display: none; }
+.lede { margin: 0 0 12px; color: var(--muted); font-size: 15px; }
+
+.towns { list-style: none; margin: 0; padding: 0; }
+.towns li button { width: 100%; display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: baseline; padding: 9px 4px; border: 0; border-bottom: 1px solid var(--rule); background: none; color: inherit; text-align: left; cursor: pointer; font: inherit; }
+.towns li button.link { display: block; border: 0; color: var(--focus); }
+.towns li button[aria-pressed="true"] { background: color-mix(in srgb, var(--smoke) 22%, transparent); }
+.towns .name { font: 600 16px/1.2 "Anek Latin"; }
+.towns .when { font: 400 13px "Spline Sans Mono"; color: var(--muted); }
+.lvl { font: 500 11px/1 "Spline Sans Mono"; padding: 4px 7px; border-radius: 999px; border: 1px solid currentColor; }
+.lvl.alert { color: var(--alert); } .lvl.watch { color: var(--watch); } .lvl.low { color: var(--muted); }
+.notice { margin: 14px 0 4px; padding: 14px; border-radius: 10px; background: var(--page); border-left: 4px solid var(--alert); }
+.notice h3 { margin: 0 0 6px; font: 700 18px/1.2 "Anek Latin"; }
+.notice p { margin: 0; }
+.notice .langs { display: flex; gap: 6px; margin: 10px 0 8px; }
+.notice .langs button { font: 500 12px/1 "Spline Sans Mono"; padding: 6px 10px; border-radius: 999px; border: 1px solid var(--rule); background: var(--panel); color: var(--ink); cursor: pointer; }
+.notice .langs button[aria-pressed="true"] { background: var(--ink); color: var(--panel); }
+.notice .msg[lang="pa"] { font-family: "Anek Gurmukhi", Mukta, sans-serif; }
+.notice .msg[lang="hi"] { font-family: "Anek Devanagari", Mukta, sans-serif; }
+.more { margin-top: 8px; font: 400 13px "Spline Sans Mono"; color: var(--muted); }
+
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th { text-align: left; font: 500 11px/1.2 "Spline Sans Mono"; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; padding: 6px 4px; border-bottom: 1px solid var(--rule); }
+td { padding: 8px 4px; border-bottom: 1px solid var(--rule); vertical-align: baseline; }
+td.num { font-family: "Spline Sans Mono"; font-size: 13px; text-align: right; }
+tbody tr { cursor: pointer; }
+tbody tr:hover, tbody tr[aria-selected="true"] { background: color-mix(in srgb, var(--smoke) 20%, transparent); }
+.rec { font: 500 11px/1 "Spline Sans Mono"; padding: 3px 6px; border-radius: 4px; }
+.rec.missed { background: var(--ember); color: #fff; } .rec.counted { background: var(--straw); color: #1C1B22; }
+.why { margin: 12px 0 0; padding: 12px; background: var(--page); border-radius: 10px; font-size: 15px; }
+.why b { font-weight: 700; }
+button.link { background: none; border: 0; color: var(--focus); font: 500 13px "Spline Sans Mono"; cursor: pointer; padding: 10px 0 0; }
+
+footer { margin-top: 28px; display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 18px; font-size: 14px; color: var(--muted); }
+footer h4 { margin: 0 0 4px; font: 600 14px "Anek Latin"; color: var(--ink); }
+footer p { margin: 0; }
+footer a { color: inherit; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">Saanjh <span class="gur">ਸਾਂਝ · dusk</span><span class="day" id="day"></span></div>
+    <h1 id="thesis">Loading tonight's fires…</h1>
+    <div class="facts" id="facts"></div>
+  </header>
+
+  <main>
+    <section class="mapcard" aria-label="Map of fires and smoke">
+      <div class="mapbox">
+        <canvas id="map" width="900" height="660" aria-label="Map of Punjab and Haryana showing fires and drifting smoke"></canvas>
+        <div class="clock"><div class="t" id="clock">--:--</div><div class="d" id="clockd"></div></div>
+        <div class="legend">
+          <span><i style="background:var(--ember)"></i>missed by the official count</span>
+          <span><i style="background:var(--straw)"></i>counted</span>
+          <span><i style="background:var(--smoke)"></i>farm smoke at ground level</span>
+        </div>
+        <div class="tip" id="tip"></div>
+      </div>
+      <div class="strip">
+        <div class="strip-head">
+          <button id="play" type="button">Play the night</button>
+          <span>Drag along the strip to see the smoke move. Ticks show when each fire was first seen.</span>
+        </div>
+        <svg id="strip" role="slider" tabindex="0" aria-label="Time of night" aria-valuemin="0"></svg>
+      </div>
+    </section>
+
+    <aside>
+      <div class="tabs" role="tablist">
+        <button role="tab" id="t-res" aria-selected="true" aria-controls="p-res">When smoke reaches you</button>
+        <button role="tab" id="t-off" aria-selected="false" aria-controls="p-off">Fires that matter tonight</button>
+      </div>
+      <div class="pane" id="p-res" role="tabpanel" aria-labelledby="t-res">
+        <p class="lede">Choose your town to see when farm smoke is expected and what schools should do.</p>
+        <ul class="towns" id="towns"></ul>
+        <div id="notice"></div>
+      </div>
+      <div class="pane" id="p-off" role="tabpanel" aria-labelledby="t-off" hidden>
+        <p class="lede">Ranked by how much smoke each fire puts into people's air over the next day, not by size. Send field teams and residue machines to the top of this list.</p>
+        <table>
+          <thead><tr><th>#</th><th>Near</th><th>First seen</th><th class="num">Share of exposure</th><th>Record</th></tr></thead>
+          <tbody id="fires"></tbody>
+        </table>
+        <button class="link" id="morefires" type="button">Show all 50</button>
+        <div id="why"></div>
+      </div>
+    </aside>
+  </main>
+
+  <footer>
+    <div><h4>How this works</h4><p>Every 10 minutes the Korean GK-2A satellite images Punjab and Haryana. Saanjh finds fires in each image, follows their smoke with forecast winds and the height of the night-time air layer, and adds it up over where people live.</p></div>
+    <div><h4>What it doesn't do</h4><p>It works on a 2–4 km grid and never names farmers or plots. Small fires under about 10 MW are often too faint to see. Smoke levels show the farm-fire share only, not total pollution.</p></div>
+    <div><h4>Data</h4><p>GK-2A (KMA, via NOAA Open Data on AWS) · VIIRS active fires (NASA FIRMS) · ERA5 and forecasts (Open-Meteo) · WorldPop 2020 · geoBoundaries. Built on AWS Lambda, Step Functions, S3, CloudFront.</p></div>
+  </footer>
+</div>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const VIEW = { w: 72.8, e: 79.2, s: 27.7, n: 32.6 };
+const KX = Math.cos(30.1 * Math.PI / 180);
+const IST = 5.5 * 3600e3;
+const S = { d: null, borders: [], frame: 0, town: null, fire: null, playing: null, lang: "en", showAll: false };
+
+const fmtIST = (ms) => new Date(ms + IST).toISOString().slice(11, 16);
+const dayIST = (ms) => new Date(ms + IST).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
+const frameTime = (k) => Date.parse(S.d.grid.t0) + k * 3600e3;
+const level = (p) => p >= 25 ? "alert" : p >= 10 ? "watch" : "low";
+const LEVEL = { alert: "Alert", watch: "Watch", low: "Low" };
+
+Promise.all([fetch("tonight.json").then(r => r.json()), fetch("borders.json").then(r => r.json())])
+  .then(([d, b]) => { S.d = d; S.borders = b; S.frames = d.frames.map(decode); init(); })
+  .catch(() => { $("#thesis").textContent = "Tonight's data hasn't been published yet. It updates every hour from 12:30 IST."; });
+
+function decode(b64) { const s = atob(b64), a = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) a[i] = s.charCodeAt(i); return a; }
+
+function init() {
+  const d = S.d, st = d.stats;
+  const dl = new Date(d.day).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
+  $("#day").textContent = d.replay ? `Replay of ${dl}` : `${dl} · updated ${fmtIST(Date.parse(d.generated))} IST`;
+  $("#thesis").innerHTML = `<em>${Math.round(st.uncounted_energy_share * 100)}%</em> of the farm-fire energy Saanjh saw ${d.replay ? "that day" : "today"} came after the satellites behind India's official count had passed.`;
+  $("#facts").innerHTML = [
+    `<span><b>${st.events}</b> fires seen</span>`,
+    `<span><b>${st.counted}</b> burning when the satellites passed</span>`,
+    `<span><b>${st.pm25_t} t</b> of PM2.5 released</span>`,
+    `<span>top 20 fires: <b>${Math.round(st.top20_harm_share * 100)}%</b> of the smoke people breathe</span>`].join("");
+  const start = d.frames.findIndex((_, k) => new Date(frameTime(k) + IST).getUTCHours() === 21);
+  S.frame = start > 0 ? start : 0;
+  buildTowns(); buildFires(); buildStrip(); sizeMap(); draw();
+  window.addEventListener("resize", () => { sizeMap(); buildStrip(); draw(); });
+}
+
+/* ---------- map ---------- */
+const cv = $("#map"), ctx = cv.getContext("2d");
+let W = 900, H = 660;
+function sizeMap() {
+  const r = cv.parentElement.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+  W = r.width; H = W * (VIEW.n - VIEW.s) / ((VIEW.e - VIEW.w) * KX);
+  cv.width = W * dpr; cv.height = H * dpr; cv.style.height = H + "px";
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+const px = (lon) => (lon - VIEW.w) / (VIEW.e - VIEW.w) * W;
+const py = (lat) => (VIEW.n - lat) / (VIEW.n - VIEW.s) * H;
+
+const smokeCv = document.createElement("canvas");
+function draw() {
+  const d = S.d; if (!d) return;
+  ctx.fillStyle = "#141A33"; ctx.fillRect(0, 0, W, H);
+  // smoke: grid row 0 is the southern edge
+  const g = d.grid, f = S.frames[S.frame];
+  smokeCv.width = g.nx; smokeCv.height = g.ny;
+  const sc = smokeCv.getContext("2d"), img = sc.createImageData(g.nx, g.ny);
+  for (let y = 0; y < g.ny; y++) for (let x = 0; x < g.nx; x++) {
+    const v = f[y * g.nx + x], o = ((g.ny - 1 - y) * g.nx + x) * 4;
+    const a = Math.max(0, Math.min(1, (v - 125) / 105));     // ~0.3 to ~40 ug/m3
+    img.data[o] = 185 + a * 50; img.data[o + 1] = 167 + a * 40; img.data[o + 2] = 214 + a * 30; img.data[o + 3] = a * 235;
+  }
+  sc.putImageData(img, 0, 0);
+  ctx.imageSmoothingEnabled = true;
+  ctx.drawImage(smokeCv, px(g.lon0), py(g.lat0 + g.ny * g.d), px(g.lon0 + g.nx * g.d) - px(g.lon0), py(g.lat0) - py(g.lat0 + g.ny * g.d));
+  // borders
+  ctx.lineWidth = 1;
+  for (const r of S.borders) {
+    ctx.strokeStyle = r.c === "PAK" ? "rgba(201,198,218,.18)" : "rgba(201,198,218,.34)";
+    ctx.beginPath(); r.p.forEach(([x, y], i) => i ? ctx.lineTo(px(x), py(y)) : ctx.moveTo(px(x), py(y))); ctx.stroke();
+  }
+  // fires: lit only once first seen at the current frame time
+  const now = frameTime(S.frame), tot = d.stats.harm_total;
+  d.fires.forEach((fr, i) => {
+    const lit = firstSeenMs(fr) <= now, r = 3 + Math.sqrt(fr.harm / tot) * 34;
+    ctx.globalAlpha = lit ? 1 : .22;
+    ctx.fillStyle = fr.counted ? "#D6A93F" : "#EE5A24";
+    ctx.beginPath(); ctx.arc(px(fr.lon), py(fr.lat), r, 0, 7); ctx.fill();
+    if (S.fire === i) { ctx.globalAlpha = 1; ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(px(fr.lon), py(fr.lat), r + 5, 0, 7); ctx.stroke(); }
+  });
+  ctx.globalAlpha = 1;
+  // towns
+  ctx.font = "500 12px 'Spline Sans Mono', monospace";
+  for (const t of d.towns) {
+    const [la, lo] = TOWNS[t.town] || []; if (!la) continue;
+    const sel = S.town === t.town;
+    ctx.fillStyle = sel ? "#fff" : "rgba(233,231,243,.85)";
+    ctx.beginPath(); ctx.arc(px(lo), py(la), sel ? 4 : 2.5, 0, 7); ctx.fill();
+    if (sel || t.peak_ugm3 >= 10 || ["Delhi", "Ludhiana", "Amritsar", "Chandigarh"].includes(t.town)) ctx.fillText(t.town, px(lo) + 6, py(la) - 5);
+  }
+  $("#clock").textContent = fmtIST(now);
+  $("#clockd").textContent = dayIST(now) + " IST";
+  drawPlayhead();
+}
+const TOWNS = { Delhi: [28.61, 77.21], Gurugram: [28.46, 77.03], Noida: [28.54, 77.39], Ghaziabad: [28.67, 77.45], Faridabad: [28.41, 77.32], Meerut: [28.98, 77.71], Sonipat: [28.99, 77.02], Panipat: [29.39, 76.97], Karnal: [29.69, 76.99], Rohtak: [28.89, 76.61], Hisar: [29.15, 75.72], Sirsa: [29.53, 75.03], Ambala: [30.38, 76.78], Chandigarh: [30.73, 76.78], Patiala: [30.34, 76.39], Sangrur: [30.25, 75.84], Ludhiana: [30.90, 75.85], Jalandhar: [31.33, 75.58], Amritsar: [31.63, 74.87], Moga: [30.82, 75.17], Bathinda: [30.21, 74.95], Ferozepur: [30.93, 74.61], Muktsar: [30.47, 74.52], Fazilka: [30.40, 74.03], "Fatehabad": [29.52, 75.45], "Ratia": [29.69, 75.58], "Tohana": [29.71, 75.9], "Mansa": [29.99, 75.4], "Barnala": [30.38, 75.55], "Kaithal": [29.8, 76.4], "Jind": [29.32, 76.31], "Tarn Taran": [31.45, 74.93], "Kapurthala": [31.38, 75.38], "Faridkot": [30.67, 74.76], "Abohar": [30.14, 74.2], "Malerkotla": [30.53, 75.88], "Gurdaspur": [32.04, 75.4], "Hoshiarpur": [31.53, 75.91], "Rupnagar": [30.97, 76.53], "Kurukshetra": [29.97, 76.85], "Yamunanagar": [30.13, 77.27], "Bhiwani": [28.79, 76.13], "Ellenabad": [29.45, 74.66], "Talwandi Sabo": [29.98, 75.08] };
+function firstSeenMs(fr) { const [h, m] = fr.first_ist.split(":").map(Number); return Date.parse(S.d.day + "T00:00Z") + (h * 60 + m) * 60e3 - IST; }
+
+cv.addEventListener("pointermove", (e) => {
+  const r = cv.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
+  const i = nearestFire(x, y), tip = $("#tip");
+  if (i < 0) { tip.style.display = "none"; return; }
+  const fr = S.d.fires[i];
+  tip.style.display = "block"; tip.style.left = px(fr.lon) + "px"; tip.style.top = py(fr.lat) + "px";
+  tip.textContent = `#${i + 1} near ${fr.near} · first seen ${fr.first_ist} · ${fr.counted ? "counted" : "missed by the count"}`;
+});
+cv.addEventListener("pointerleave", () => $("#tip").style.display = "none");
+cv.addEventListener("click", (e) => { const r = cv.getBoundingClientRect(), i = nearestFire(e.clientX - r.left, e.clientY - r.top); if (i >= 0) { selectTab("off"); selectFire(i); } });
+function nearestFire(x, y) { let best = -1, bd = 14 * 14; S.d.fires.forEach((f, i) => { const dd = (px(f.lon) - x) ** 2 + (py(f.lat) - y) ** 2; if (dd < bd) { bd = dd; best = i; } }); return best; }
+
+/* ---------- night strip ---------- */
+const strip = $("#strip");
+function sky(hIST) {  // colour of the sky over Punjab in November at this hour
+  const h = (hIST + 24) % 24;
+  if (h >= 7 && h < 16) return "#8C7A45";
+  if (h >= 16 && h < 17.5) return "#A0522D";
+  if (h >= 17.5 && h < 18.5) return "#4B2C4F";
+  if (h >= 6 && h < 7) return "#4B3B5C";
+  return "#1D2345";
+}
+function buildStrip() {
+  if (!S.d) return;
+  const n = S.frames.length, w = strip.getBoundingClientRect().width || 600, h = 104, bandY = 52, bandH = 22;
+  const xk = (k) => k / (n - 1) * w;
+  let s = "";
+  for (let k = 0; k < n - 1; k++) { const hh = new Date(frameTime(k) + IST).getUTCHours(); s += `<rect x="${xk(k)}" y="${bandY}" width="${xk(k + 1) - xk(k) + .5}" height="${bandH}" fill="${sky(hh)}"/>`; }
+  // first-seen ticks above the band, one per fire event, binned by the hour it was first seen
+  const t0 = frameTime(0), hist = S.d.stats.first_seen, maxc = Math.max(...Object.values(hist));
+  for (const [hm, c] of Object.entries(hist)) {
+    const [hh, mm] = hm.split(":").map(Number), ms = Date.parse(S.d.day + "T00:00Z") + (hh * 60 + mm) * 60e3 - IST;
+    const k = (ms - t0) / 3600e3; if (k < 0 || k > n - 1) continue;
+    const bh = 4 + c / maxc * 34;
+    s += `<rect x="${xk(k) + 1}" y="${bandY - bh - 2}" width="${Math.max(3, w / n - 3)}" height="${bh}" fill="#EE5A24" rx="1.5"><title>${c} fires first seen ${hm}</title></rect>`;
+  }
+  // where the polar satellites pass
+  const pass = Date.parse(S.d.day + "T08:00Z"), kp = (pass - t0) / 3600e3;
+  if (kp >= 0) s += `<line x1="${xk(kp)}" x2="${xk(kp)}" y1="2" y2="${bandY + bandH + 4}" stroke="#D6A93F" stroke-width="1.5" stroke-dasharray="3 3"/><text x="${xk(kp) - 4}" y="10" text-anchor="end" style="fill:#D6A93F">satellites pass ${fmtIST(pass)}</text>`;
+  // hour labels
+  for (let k = 0; k < n; k += 3) s += `<text x="${xk(k)}" y="${h - 8}" text-anchor="${k ? "middle" : "start"}">${fmtIST(frameTime(k))}</text>`;
+  if (S.town) { const t = S.d.towns.find(t => t.town === S.town); const k = kFromLabel(t.arrives_ist); if (k >= 0) s += `<path d="M${xk(k)} ${bandY + bandH + 2} l-5 8 h10z" fill="#B9A7D6"/><text x="${xk(k) + 8}" y="${bandY + bandH + 10}" style="fill:#B9A7D6">smoke reaches ${S.town}</text>`; }
+  s += `<line id="ph" y1="14" y2="${bandY + bandH + 2}" stroke="#fff" stroke-width="2"/>`;
+  strip.setAttribute("viewBox", `0 0 ${w} ${h}`); strip.innerHTML = s;
+  strip.setAttribute("aria-valuemax", n - 1);
+  drawPlayhead();
+}
+function kFromLabel(lbl) { if (!lbl) return -1; const hm = lbl.slice(-5); for (let k = 0; k < S.frames.length; k++) if (fmtIST(frameTime(k)) === hm && k >= 0) return k; return -1; }
+function drawPlayhead() {
+  const ph = strip.querySelector("#ph"); if (!ph) return;
+  const w = strip.viewBox.baseVal.width, x = S.frame / (S.frames.length - 1) * w;
+  ph.setAttribute("x1", x); ph.setAttribute("x2", x);
+  strip.setAttribute("aria-valuenow", S.frame); strip.setAttribute("aria-valuetext", fmtIST(frameTime(S.frame)) + " IST");
+}
+function scrub(e) { const r = strip.getBoundingClientRect(); setFrame(Math.round((e.clientX - r.left) / r.width * (S.frames.length - 1))); }
+strip.addEventListener("pointerdown", (e) => { stop(); strip.setPointerCapture(e.pointerId); scrub(e); });
+strip.addEventListener("pointermove", (e) => { if (e.buttons) scrub(e); });
+strip.addEventListener("keydown", (e) => { if (e.key === "ArrowRight") setFrame(S.frame + 1); if (e.key === "ArrowLeft") setFrame(S.frame - 1); });
+function setFrame(k) { S.frame = Math.max(0, Math.min(S.frames.length - 1, k)); draw(); }
+function stop() { clearInterval(S.playing); S.playing = null; $("#play").textContent = "Play the night"; }
+$("#play").addEventListener("click", () => {
+  if (S.playing) return stop();
+  if (S.frame >= S.frames.length - 1) S.frame = 0;
+  const step = matchMedia("(prefers-reduced-motion: reduce)").matches ? 900 : 380;
+  S.playing = setInterval(() => S.frame >= S.frames.length - 1 ? stop() : setFrame(S.frame + 1), step);
+  $("#play").textContent = "Pause";
+});
+
+/* ---------- residents ---------- */
+function buildTowns() {
+  const smoky = (t) => level(t.peak_ugm3) !== "low";
+  const ts = [...S.d.towns].sort((a, b) => smoky(b) - smoky(a) || (kFromLabel(a.arrives_ist) - kFromLabel(b.arrives_ist)) || b.peak_ugm3 - a.peak_ugm3);
+  const shown = ts.filter(t => smoky(t) || S.allTowns || t.town === S.town), hiddenN = ts.length - shown.length;
+  $("#towns").innerHTML = shown.map(t => `<li><button type="button" data-town="${t.town}" aria-pressed="${S.town === t.town}">
+      <span class="name">${t.town}</span><span class="when">${smoky(t) ? "from " + t.arrives_ist.slice(-5) : "little smoke"}</span>
+      <span class="lvl ${level(t.peak_ugm3)}">${LEVEL[level(t.peak_ugm3)]}</span></button></li>`).join("")
+    + (hiddenN ? `<li><button type="button" class="link" id="alltowns">Show ${hiddenN} towns with little farm smoke</button></li>` : "");
+  const at = $("#alltowns"); if (at) at.addEventListener("click", () => { S.allTowns = true; buildTowns(); });
+  $("#towns").querySelectorAll("button").forEach(b => b.addEventListener("click", () => selectTown(b.dataset.town)));
+  renderNotice();
+}
+function selectTown(name) {
+  S.town = name; const t = S.d.towns.find(t => t.town === name), k = kFromLabel(t.peak_ist);
+  if (k >= 0) S.frame = k;
+  buildTowns(); buildStrip(); draw();
+}
+const MSG = {
+  en: (t) => `Smoke from farm fires is expected over ${t.town} from about ${t.arrives_ist.slice(-5)}. It will be worst around ${t.peak_ist.slice(-5)}. Hold tomorrow's morning assembly indoors and keep windows shut overnight.`,
+  hi: (t) => `${t.town} में पराली के धुएँ का असर लगभग ${t.arrives_ist.slice(-5)} बजे से रहेगा, सबसे ज़्यादा ${t.peak_ist.slice(-5)} के आसपास। कल सुबह की प्रार्थना सभा अंदर करें और रात में खिड़कियाँ बंद रखें।`,
+  pa: (t) => `${t.town} ਵਿੱਚ ਪਰਾਲੀ ਦਾ ਧੂੰਆਂ ਲਗਭਗ ${t.arrives_ist.slice(-5)} ਵਜੇ ਤੋਂ ਆਵੇਗਾ, ਸਭ ਤੋਂ ਵੱਧ ${t.peak_ist.slice(-5)} ਦੇ ਨੇੜੇ। ਕੱਲ੍ਹ ਸਵੇਰ ਦੀ ਸਭਾ ਅੰਦਰ ਕਰੋ ਅਤੇ ਰਾਤ ਨੂੰ ਖਿੜਕੀਆਂ ਬੰਦ ਰੱਖੋ।`,
+};
+function renderNotice() {
+  const t = S.town && S.d.towns.find(t => t.town === S.town);
+  if (!t) { $("#notice").innerHTML = ""; return; }
+  const lv = level(t.peak_ugm3);
+  if (lv === "low") { $("#notice").innerHTML = `<div class="notice" style="border-left-color:var(--muted)"><h3>${t.town}: little farm smoke expected</h3><p>Predicted farm-fire smoke stays under 10 µg/m³ of PM2.5. Other pollution sources still apply.</p></div>`; return; }
+  $("#notice").innerHTML = `<div class="notice" style="border-left-color:var(--${lv})"><h3>${t.town}: ${lv === "alert" ? "keep children indoors tomorrow morning" : "farm smoke expected tonight"}</h3>
+    <div class="langs">${["en", "hi", "pa"].map(l => `<button type="button" data-l="${l}" aria-pressed="${S.lang === l}">${{ en: "English", hi: "हिन्दी", pa: "ਪੰਜਾਬੀ" }[l]}</button>`).join("")}</div>
+    <p class="msg" lang="${S.lang}">${MSG[S.lang](t)}</p>
+    <p class="more">Farm smoke peak: +${t.peak_ugm3.toFixed(0)} µg/m³ PM2.5 · alerts go out above 25</p></div>`;
+  $("#notice").querySelectorAll(".langs button").forEach(b => b.addEventListener("click", () => { S.lang = b.dataset.l; renderNotice(); }));
+}
+
+/* ---------- officers ---------- */
+function buildFires() {
+  const tot = S.d.stats.harm_total, rows = S.d.fires.slice(0, S.showAll ? 50 : 20);
+  $("#fires").innerHTML = rows.map((f, i) => `<tr data-i="${i}" aria-selected="${S.fire === i}" tabindex="0">
+      <td>${i + 1}</td><td>${f.near}</td><td>${f.first_ist}</td><td class="num">${(f.harm / tot * 100).toFixed(1)}%</td>
+      <td><span class="rec ${f.counted ? "counted" : "missed"}">${f.counted ? "Counted" : "Missed"}</span></td></tr>`).join("");
+  $("#fires").querySelectorAll("tr").forEach(r => { r.addEventListener("click", () => selectFire(+r.dataset.i)); r.addEventListener("keydown", (e) => e.key === "Enter" && selectFire(+r.dataset.i)); });
+  $("#morefires").textContent = S.showAll ? "Show top 20" : "Show all 50";
+}
+$("#morefires").addEventListener("click", () => { S.showAll = !S.showAll; buildFires(); });
+function selectFire(i) {
+  S.fire = i; const f = S.d.fires[i], tot = S.d.stats.harm_total;
+  const k = Math.round((firstSeenMs(f) - frameTime(0)) / 3600e3) + 6; if (k >= 0) S.frame = Math.min(k, S.frames.length - 1);
+  buildFires(); draw();
+  const hours = f.scans > 1 ? `seen in ${f.scans} hourly images` : "seen in one hourly image";
+  $("#why").innerHTML = `<div class="why"><b>Why #${i + 1}:</b> near ${f.near}, first seen at ${f.first_ist} and ${hours}, releasing about ${Math.round(f.pm25_kg)} kg of PM2.5.
+    ${f.counted ? "The polar satellites saw it burning." : "<b>It started after the polar satellites passed, so the official count missed it.</b>"}
+    Its smoke drifts into populated areas under tonight's shallow air layer, giving it ${(f.harm / tot * 100).toFixed(1)}% of all people-hours of farm smoke from today's fires.</div>`;
+}
+
+/* ---------- tabs ---------- */
+function selectTab(which) {
+  for (const t of ["res", "off"]) { $("#t-" + t).setAttribute("aria-selected", t === which); $("#p-" + t).hidden = t !== which; }
+}
+$("#t-res").addEventListener("click", () => selectTab("res"));
+$("#t-off").addEventListener("click", () => selectTab("off"));
+</script>
+</body>
+</html>
