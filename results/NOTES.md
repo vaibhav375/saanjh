@@ -7,7 +7,7 @@
 either scan bracketing the overpass; z threshold 6.)
 
 Probability of detection by summed VIIRS FRP in the AMI pixel: see `pod2024_pod.csv`.
-Roughly 4% below 5 MW, 10% at 5–10 MW, 16% at 10–20 MW, 32–36% at 20–80 MW.
+4% below 5 MW, 10% at 5–10 MW, 16% at 10–20 MW, 32% at 20–40 MW, 51% at 40–80 MW, 44% above 80 MW (n=25).
 79% of GK-2A detections have a VIIRS fire within one pixel (443 detections).
 
 Lesson: the first run showed 46% unmatched detections. Mapping them showed most were in Pakistani
