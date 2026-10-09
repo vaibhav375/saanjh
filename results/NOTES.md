@@ -99,3 +99,25 @@ Probability of detection by summed VIIRS FRP per pixel: 3% (<5 MW), 7% (5–10),
 excluding 18–21 Oct 2025**, when weak (~5 MW) detections scattered 30–50 km from any VIIRS fire across the
 region (not a navigation offset: no consistent shift). Cause not yet diagnosed; those days are 5.9% of the
 season's detected energy. Median unmatched per day: 3 (2025) vs 4 (2024).
+
+## N4: the ablation, 2025 held-out season (`scripts/ablation.py 2025`)
+
+Same smoke model and ERA5 weather, two inventories: **A** VIIRS fires at the overpass with the midday-peaked
+diurnal profile operational inventories assume; **B** Saanjh's GK-2A fires at the times they were seen.
+Score: Pearson r between daily station-mean anomalies of modelled farm smoke and measured PM2.5
+(82 CPCB stations via OpenAQ), with a 500-sample bootstrap over days for the gain B − A.
+
+| Stations | Period | r (overpass-only) | r (Saanjh) | Gain [95% CI] |
+| --- | --- | --- | --- | --- |
+| Punjab/Haryana/W-UP (33) | season | 0.23 | 0.28 | +0.06 [0.00, +0.12] |
+| Punjab/Haryana/W-UP | Nov | 0.21 | 0.29 | **+0.08 [+0.01, +0.16]** |
+| All (82) | Oct | 0.13 | 0.26 | **+0.13 [+0.04, +0.22]** |
+| All (82) | season | 0.28 | 0.33 | +0.05 [−0.01, +0.11] |
+| Delhi-NCR (49) | season | 0.36 | 0.37 | +0.01 [−0.07, +0.08] |
+
+Adding the evening fires the overpass misses makes modelled smoke track measured PM2.5 better near the fires,
+significantly in November there and across all stations in October. In Delhi there is no difference: local
+sources dominate and both inventories share the same transport. At the hourly scale neither inventory explains
+much (R² < 0.04 after removing each station's diurnal cycle), so Saanjh's alerts are about which nights and
+which towns, not exact hours. (First run had a bug: OpenAQ stamps hourly means at xx:30 UTC; fixed by using
+the hour midpoint.)
