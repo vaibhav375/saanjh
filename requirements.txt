@@ -10,3 +10,4 @@ matplotlib
 requests
 pytest
 moto[s3,sns]
+strands-agents

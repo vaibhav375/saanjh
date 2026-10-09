@@ -14,4 +14,9 @@ cp data/pop/pop_grid.npy build/app/saanjh/assets/pop/
 # numpy 2.x imports from numpy/_core/tests at runtime, so its tests stay.
 find build/layer -type d -name __pycache__ -prune -exec rm -rf {} +
 find build/layer -type d -name tests -not -path "*/numpy/*" -prune -exec rm -rf {} +
-du -sh build/app build/layer
+# The assistant's own layer (Strands Agents + a current boto3 for Bedrock Converse).
+mkdir -p build/agent_layer/python
+.venv/bin/pip install -q --target build/agent_layer/python --platform manylinux2014_aarch64 \
+  --implementation cp --python-version 3.12 --only-binary=:all: strands-agents requests
+find build/agent_layer -type d -name __pycache__ -prune -exec rm -rf {} +
+du -sh build/app build/layer build/agent_layer

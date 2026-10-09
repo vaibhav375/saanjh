@@ -153,7 +153,7 @@ def tonight(day, met, events, hours=30, viirs=None):
         series = conc[:, int((la - smoke.LAT0) / smoke.D), int((lo - smoke.LON0) / smoke.D)]
         k_peak = int(series.argmax())
         over = np.nonzero(series > 0.25 * series.max())[0] if series.max() > 0 else []
-        towns.append(dict(town=name, peak_ugm3=series.max(), peak_ist=f"{t0 + timedelta(hours=k_peak) + IST:%a %H:%M}",
+        towns.append(dict(town=name, lat=la, lon=lo, peak_ugm3=series.max(), peak_ist=f"{t0 + timedelta(hours=k_peak) + IST:%a %H:%M}",
                           arrives_ist=f"{t0 + timedelta(hours=int(over[0])) + IST:%a %H:%M}" if len(over) else ""))
     return src, pd.DataFrame(towns).sort_values("peak_ugm3", ascending=False), conc, t0
 

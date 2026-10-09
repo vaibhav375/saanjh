@@ -175,6 +175,9 @@ def site_handler(event, _ctx=None):
                 body = s3.get_object(Bucket=SITE, Key="tonight.json")["Body"].read()
             return dict(statusCode=200, headers={"Content-Type": TYPES[".json"], "Cache-Control": "max-age=60"},
                         body=body.decode())
+        if path == "config.json":
+            return dict(statusCode=200, headers={"Content-Type": TYPES[".json"]},
+                        body=json.dumps({"agent_url": os.environ.get("AGENT_URL", "")}))
         if path in ("index.html", "borders.json"):
             with open(os.path.join(STATIC, path), encoding="utf-8") as f:
                 return dict(statusCode=200, headers={"Content-Type": TYPES[os.path.splitext(path)[1]],

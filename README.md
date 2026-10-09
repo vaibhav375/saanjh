@@ -45,6 +45,9 @@ EventBridge Scheduler (hourly, 12:35–00:35 IST) ──▶ Lambda: fire events 
 Step Functions Map (8 days in parallel) ──▶ the same Lambdas over NOAA's archive  →  season replays
 ```
 
+An "Ask Saanjh" assistant (Strands Agents SDK, Claude on Amazon Bedrock) answers officers' questions such as
+"why is fire #3 ranked third?" using four read-only tools over the published night and live CPCB readings.
+
 Everything is in [template.yaml](template.yaml) (AWS SAM). The Lambdas run next to NOAA's bucket, which
 matters: from a laptop in India each crop takes ~17 s to download; in us-east-1 it takes about a second.
 
@@ -57,6 +60,7 @@ matters: from a laptop in India each crop takes ~17 s to download; in us-east-1 
 | `saanjh/smoke.py` | Lagrangian smoke model on ERA5 / forecast winds with residual-layer mixing; WorldPop exposure |
 | `saanjh/pipeline.py` | One evening end to end: fire events, counted vs missed, ranking, town arrival times, page JSON |
 | `saanjh/aws.py` | Lambda handlers (live SQS, day replay, hourly model, alerts, the page) |
+| `saanjh/agent.py` | "Ask Saanjh": a Strands Agents assistant on Amazon Bedrock that explains the ranking from the published data |
 | `site/` | The public page and officer console (static, reads `tonight.json`) |
 | `scripts/` | Data fetchers, scoring against VIIRS, dusk-penalty experiment, packaging |
 | `PLAN.md` | Plan of record and the research behind the track choice |

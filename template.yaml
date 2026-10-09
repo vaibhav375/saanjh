@@ -8,6 +8,11 @@ Parameters:
     Default: ""
     Description: Optional email to subscribe to smoke alerts (confirm the email AWS sends).
 
+  OpenAqApiKey:
+    Type: String
+    Default: ""
+    NoEcho: true
+    Description: OpenAQ API key, used by the assistant to read live CPCB PM2.5.
   FirmsMapKey:
     Type: String
     Default: ""
@@ -22,7 +27,6 @@ Globals:
     Runtime: python3.12
     Architectures: [arm64]
     CodeUri: build/app
-    Layers: [!Ref Deps]
     Environment:
       Variables:
         DATA_BUCKET: !Ref DataBucket
@@ -72,6 +76,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       Handler: saanjh.aws.detect_handler
+      Layers: [!Ref Deps]
       MemorySize: 2048
       Timeout: 900
       Policies:
@@ -87,6 +92,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       Handler: saanjh.aws.model_handler
+      Layers: [!Ref Deps]
       MemorySize: 3008
       Timeout: 900
       Environment:
@@ -159,6 +165,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       Handler: saanjh.aws.site_handler
+      Layers: [!Ref Deps]
       MemorySize: 512
       Timeout: 15
       Policies:
@@ -166,6 +173,40 @@ Resources:
         - S3ReadPolicy: {BucketName: !Ref DataBucket}
       FunctionUrlConfig:
         AuthType: NONE
+      Environment:
+        Variables:
+          AGENT_URL: !GetAtt AgentFnUrl.FunctionUrl
+
+  AgentDeps:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      ContentUri: build/agent_layer
+      CompatibleRuntimes: [python3.12]
+      CompatibleArchitectures: [arm64]
+
+  # "Ask Saanjh": a Strands agent on Bedrock that explains tonight's ranking from the published data.
+  AgentFn:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: saanjh.agent.ask_handler
+      Layers: [!Ref AgentDeps]
+      MemorySize: 512
+      Timeout: 60
+      Environment:
+        Variables:
+          OPENAQ_API_KEY: !Ref OpenAqApiKey
+      Policies:
+        - S3ReadPolicy: {BucketName: !Ref SiteBucket}
+        - S3ReadPolicy: {BucketName: !Ref DataBucket}
+        - Statement:
+            - Effect: Allow
+              Action: [bedrock:InvokeModel, bedrock:InvokeModelWithResponseStream]
+              Resource: "*"
+      FunctionUrlConfig:
+        AuthType: NONE
+        Cors:
+          AllowOrigins: ["*"]
+          AllowMethods: [GET]
 
 Outputs:
   SiteUrl:
@@ -176,3 +217,5 @@ Outputs:
     Value: !Ref SiteBucket
   ReplayStateMachine:
     Value: !Ref Replay
+  AgentUrl:
+    Value: !GetAtt AgentFnUrl.FunctionUrl

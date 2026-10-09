@@ -106,6 +106,13 @@ tbody tr:hover, tbody tr[aria-selected="true"] { background: color-mix(in srgb, 
 .why b { font-weight: 700; }
 button.link { background: none; border: 0; color: var(--focus); font: 500 13px "Spline Sans Mono"; cursor: pointer; padding: 10px 0 0; }
 
+.ask { margin-top: 16px; }
+.ask label { display: block; font: 600 14px "Anek Latin"; margin-bottom: 6px; }
+.ask div { display: flex; gap: 6px; }
+.ask input { flex: 1; min-width: 0; font: inherit; font-size: 15px; padding: 9px 10px; border-radius: 8px; border: 1px solid var(--rule); background: var(--page); color: var(--ink); }
+.ask button, .why button { font: 500 13px "Spline Sans Mono"; padding: 8px 12px; border-radius: 8px; border: 0; background: var(--ink); color: var(--panel); cursor: pointer; }
+.why button { margin-top: 10px; }
+#answer { margin: 10px 0 0; font-size: 15px; white-space: pre-wrap; }
 footer { margin-top: 28px; display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 18px; font-size: 14px; color: var(--muted); }
 footer h4 { margin: 0 0 4px; font: 600 14px "Anek Latin"; color: var(--ink); }
 footer p { margin: 0; }
@@ -160,6 +167,12 @@ footer a { color: inherit; }
         </table>
         <button class="link" id="morefires" type="button">Show all 50</button>
         <div id="why"></div>
+        <form id="askform" class="ask">
+          <label for="askq">Ask about tonight's fires</label>
+          <div><input id="askq" name="q" maxlength="300" placeholder="Which fires should Patiala's team visit first?" autocomplete="off">
+          <button type="submit">Ask</button></div>
+          <p id="answer" aria-live="polite"></p>
+        </form>
       </div>
     </aside>
   </main>
@@ -391,8 +404,27 @@ function selectFire(i) {
     : `first seen by GK-2A at ${f.first_ist} and seen in ${f.scans} image${f.scans > 1 ? "s" : ""}, releasing about ${Math.round(f.pm25_kg)} kg of PM2.5`;
   $("#why").innerHTML = `<div class="why"><b>Why #${i + 1}:</b> near ${f.near}, ${seen}.
     ${f.counted ? "It is in the official count." : "<b>It started after the polar satellites passed, so the official count missed it.</b>"}
-    Its smoke drifts into populated areas under tonight's shallow air layer, giving it ${(f.harm / tot * 100).toFixed(1)}% of all people-hours of farm smoke from today's fires.</div>`;
+    Its smoke drifts into populated areas under tonight's shallow air layer, giving it ${(f.harm / tot * 100).toFixed(1)}% of all people-hours of farm smoke from today's fires.
+    <br><button type="button" id="askwhy">Ask Saanjh why</button></div>`;
+  $("#askwhy").addEventListener("click", () => ask({ rank: i + 1 }));
 }
+
+/* ---------- assistant (Strands agent on Amazon Bedrock) ---------- */
+let AGENT = null;
+fetch("config.json").then(r => r.json()).then(c => { AGENT = c.agent_url || null; }).catch(() => {});
+async function ask(params) {
+  const out = $("#answer");
+  if (!AGENT) { out.textContent = "The assistant isn't available on this copy of the page."; return; }
+  out.textContent = "Thinking…";
+  const qs = new URLSearchParams(params);
+  if (S.d.replay) qs.set("day", S.d.day);
+  try {
+    const r = await fetch(AGENT + "?" + qs.toString()), j = await r.json();
+    out.textContent = j.answer || j.error || "No answer came back. Try again in a minute.";
+  } catch { out.textContent = "Couldn't reach the assistant. Check your connection and try again."; }
+  out.scrollIntoView({ block: "nearest" });
+}
+$("#askform").addEventListener("submit", (e) => { e.preventDefault(); const q = $("#askq").value.trim(); if (q) ask({ q }); });
 
 /* ---------- tabs ---------- */
 function selectTab(which) {
