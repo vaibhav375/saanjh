@@ -5,6 +5,7 @@ Geolocation follows the CGMS geostationary projection (scan angles from cfac/lfa
 calibration follows satpy's ami_l1b reader with the in-file Teff->Tbb coefficients.
 """
 import os
+import time
 from datetime import datetime
 
 import numpy as np
@@ -63,6 +64,14 @@ def crop_grid(win=WIN):
     return linecol_to_latlon(lines, cols)
 
 
+def pixel_area_km2(win=WIN):
+    """Ground area of each crop pixel (km^2), from the Jacobian of the geolocation."""
+    lat, lon = crop_grid(win)
+    dlat_l, dlat_c = np.gradient(lat)
+    dlon_l, dlon_c = np.gradient(lon)
+    return np.abs(dlat_l * dlon_c - dlat_c * dlon_l) * 110.57 * 111.32 * np.cos(np.radians(lat))
+
+
 def counts_to_bt(counts, attrs, band):
     """Counts -> brightness temperature (K); bad pixels become NaN."""
     valid = (counts >> 14) == 0  # top 2 bits are the quality flag; 0 = good
@@ -101,10 +110,16 @@ def cached_bt(band, t: datetime):
     path = os.path.join(CACHE, "_".join(map(str, WIN)), f"{band}_{t:%Y%m%d%H%M}.npy")
     if os.path.exists(path):
         return np.load(path)
-    try:
-        bt = read_bt(url(band, t), band).astype("f4")
-    except FileNotFoundError:
-        return None
+    for attempt in range(4):
+        try:
+            bt = read_bt(url(band, t), band).astype("f4")
+            break
+        except FileNotFoundError:
+            return None
+        except Exception:  # S3 drops long range requests now and then
+            if attempt == 3:
+                raise
+            time.sleep(2 ** attempt)
     os.makedirs(os.path.dirname(path), exist_ok=True)
     np.save(path, bt)
     return bt
