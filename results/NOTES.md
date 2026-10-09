@@ -42,3 +42,20 @@ uniform mixing within H_p.
 energy is in events first seen at or after 14:00 IST. Only 50 events were already burning at the VIIRS
 overpass with VIIRS fire in the pixel: **87% of the day's detected fire energy was uncounted.**
 Smoke arrives at Fazilka/Muktsar 17–18 IST, Sangrur 23 IST, Sirsa 01 IST, Noida/Ghaziabad 04–07 IST next day.
+
+## N1: the 2024 season, replayed in the cloud (15 Oct – 30 Nov, every 10-minute GK-2A image)
+
+Step Functions → 47 parallel day runs of the same Lambdas that serve the live system (~90 s per day).
+`scripts/season_summary.py <data bucket> 2024` → `results/season_2024.csv`, `figures/season_2024.png`.
+
+- 45,342 fire events; 1,092 TJ of fire radiative energy; ~2,500 t PM2.5 (from the energy, before any
+  correction for fires too small for GK-2A to see).
+- **90.8% of the season's detected fire energy came from fires that started after the polar overpass.**
+  iFOREST, using Meteosat, independently reports over 90% of large fires after 3 pm (2024–2025).
+- Fire events by hour first seen (IST): 12h 1,201 · 13h 2,723 · 14h 4,231 · 15h 12,670 · **16h 14,440** · 17h 7,023 ·
+  18h 760 · 19h 1,103 · 20h 1,007 · 21h 184.
+- Daily energy peaks on 31 Oct–1 Nov (Diwali) and 17–19 Nov (Delhi's "severe+" week), as expected.
+
+Caveats: the share is of energy GK-2A can see, which favours larger fires; midday detection is harder than
+evening (solar heating), which can push the share up. The 18:00 dip is likely the sunset threshold change
+in the detector, not a real lull.

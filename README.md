@@ -17,8 +17,12 @@ system that study calls for:
 
 ## What we measured (2024 season, details in [results/NOTES.md](results/NOTES.md))
 
+![2024 season](figures/season_2024.png)
+
+
 | | Result |
 | --- | --- |
+| Fire energy missed by the overpass, whole 2024 season | **90.8%** of 1,092 TJ detected (45,342 fire events, 15 Oct–30 Nov, every 10-minute image, replayed on AWS) |
 | Fire energy missed by the overpass, 18 Nov 2024 | **87%** of the fire energy GK-2A detected came from fires not yet burning when VIIRS passed |
 | Strong hotspots, same day | **2** at the 13:40 IST overpass vs **70–78** at 16:00–16:30 IST |
 | The dusk penalty | The same fire lit at 17:00 instead of 13:00 causes **2–4×** the population smoke exposure (3.2× at a 200 m plume floor; 1.3× even at 800 m) |
