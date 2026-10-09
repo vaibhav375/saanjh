@@ -1,0 +1,188 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: Saanjh - evening farm-fire detection from GK-2A, smoke forecast and alerts (us-east-1, next to NOAA's bucket)
+
+Parameters:
+  AlertEmail:
+    Type: String
+    Default: ""
+    Description: Optional email to subscribe to smoke alerts (confirm the email AWS sends).
+
+Conditions:
+  HasEmail: !Not [!Equals [!Ref AlertEmail, ""]]
+
+Globals:
+  Function:
+    Runtime: python3.12
+    Architectures: [arm64]
+    CodeUri: build/app
+    Layers: [!Ref Deps]
+    Environment:
+      Variables:
+        DATA_BUCKET: !Ref DataBucket
+        SITE_BUCKET: !Ref SiteBucket
+        ALERT_TOPIC_ARN: !Ref AlertTopic
+
+Resources:
+  DataBucket:
+    Type: AWS::S3::Bucket
+  SiteBucket:
+    Type: AWS::S3::Bucket
+
+  Deps:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      ContentUri: build/layer
+      CompatibleRuntimes: [python3.12]
+      CompatibleArchitectures: [arm64]
+
+  # Live path: NOAA publishes every new GK-2A file to this public topic (Lambda/SQS subscribers only).
+  LiveQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      VisibilityTimeout: 960
+      MessageRetentionPeriod: 86400
+  LiveQueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues: [!Ref LiveQueue]
+      PolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal: {Service: sns.amazonaws.com}
+            Action: sqs:SendMessage
+            Resource: !GetAtt LiveQueue.Arn
+            Condition:
+              ArnEquals: {aws:SourceArn: arn:aws:sns:us-east-1:709902155096:NewGK2AObject}
+  NoaaSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      TopicArn: arn:aws:sns:us-east-1:709902155096:NewGK2AObject
+      Protocol: sqs
+      Endpoint: !GetAtt LiveQueue.Arn
+
+  DetectFn:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: saanjh.aws.detect_handler
+      MemorySize: 2048
+      Timeout: 900
+      Policies:
+        - S3CrudPolicy: {BucketName: !Ref DataBucket}
+      Events:
+        Live:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt LiveQueue.Arn
+            BatchSize: 10  # NOAA posts ~16 files per scan; the handler ignores all but sw038/ir112
+
+  ModelFn:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: saanjh.aws.model_handler
+      MemorySize: 3008
+      Timeout: 900
+      Policies:
+        - S3CrudPolicy: {BucketName: !Ref DataBucket}
+        - S3CrudPolicy: {BucketName: !Ref SiteBucket}
+        - SNSPublishMessagePolicy: {TopicName: !GetAtt AlertTopic.TopicName}
+      Events:
+        Hourly:
+          Type: ScheduleV2
+          Properties:
+            # 12:35 IST to 00:35 IST, every hour
+            ScheduleExpression: cron(35 7-19 * * ? *)
+
+  AlertTopic:
+    Type: AWS::SNS::Topic
+  AlertEmailSub:
+    Type: AWS::SNS::Subscription
+    Condition: HasEmail
+    Properties:
+      TopicArn: !Ref AlertTopic
+      Protocol: email
+      Endpoint: !Ref AlertEmail
+
+  # Season replay: one Lambda run per day detects every scan in NOAA's archive, then models that day.
+  Replay:
+    Type: AWS::Serverless::StateMachine
+    Properties:
+      Policies:
+        - LambdaInvokePolicy: {FunctionName: !Ref DetectFn}
+        - LambdaInvokePolicy: {FunctionName: !Ref ModelFn}
+      Definition:
+        StartAt: Days
+        States:
+          Days:
+            Type: Map
+            ItemsPath: $.days
+            MaxConcurrency: 40
+            ItemProcessor:
+              StartAt: Detect
+              States:
+                Detect:
+                  Type: Task
+                  Resource: arn:aws:states:::lambda:invoke
+                  Parameters:
+                    FunctionName: !Ref DetectFn
+                    Payload: {"day.$": "$.day", "step_min.$": "$.step_min"}
+                  ResultPath: $.detect
+                  Retry: [{ErrorEquals: [States.ALL], MaxAttempts: 2, IntervalSeconds: 5}]
+                  Next: Model
+                Model:
+                  Type: Task
+                  Resource: arn:aws:states:::lambda:invoke
+                  Parameters:
+                    FunctionName: !Ref ModelFn
+                    Payload: {"day.$": "$.day", "replay": true}
+                  OutputPath: $.Payload
+                  Retry: [{ErrorEquals: [States.ALL], MaxAttempts: 2, IntervalSeconds: 30}]
+                  End: true
+            End: true
+
+  # Public page: private bucket behind CloudFront.
+  SiteOAC:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: !Sub "${AWS::StackName}-site"
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+  SiteCdn:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        DefaultRootObject: index.html
+        Origins:
+          - Id: site
+            DomainName: !GetAtt SiteBucket.RegionalDomainName
+            OriginAccessControlId: !GetAtt SiteOAC.Id
+            S3OriginConfig: {OriginAccessIdentity: ""}
+        DefaultCacheBehavior:
+          TargetOriginId: site
+          ViewerProtocolPolicy: redirect-to-https
+          CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad  # Managed-CachingDisabled: tonight.json changes hourly
+  SiteBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref SiteBucket
+      PolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal: {Service: cloudfront.amazonaws.com}
+            Action: s3:GetObject
+            Resource: !Sub "${SiteBucket.Arn}/*"
+            Condition:
+              StringEquals: {AWS:SourceArn: !Sub "arn:aws:cloudfront::${AWS::AccountId}:distribution/${SiteCdn}"}
+
+Outputs:
+  SiteUrl:
+    Value: !Sub "https://${SiteCdn.DomainName}"
+  DataBucket:
+    Value: !Ref DataBucket
+  SiteBucket:
+    Value: !Ref SiteBucket
+  ReplayStateMachine:
+    Value: !Ref Replay

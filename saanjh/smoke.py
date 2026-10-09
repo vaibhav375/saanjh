@@ -23,7 +23,7 @@ MET_D = 0.5
 H_MIN = 200.0          # m, plume injection floor; sensitivity-tested in the notes
 K_H = 1000.0           # m2/s horizontal eddy diffusivity
 TAU_H = 72.0           # h, e-folding PM2.5 removal time
-DATA = os.path.join(os.path.dirname(__file__), "..", "data")
+DATA = os.environ.get("SAANJH_DATA", os.path.join(os.path.dirname(__file__), "..", "data"))
 
 
 def cell_area_m2():
@@ -67,9 +67,13 @@ class Met:
         return self.u(p), self.v(p), np.maximum(self.blh(p), 10.0)
 
     @classmethod
-    def era5(cls, start: datetime, end: datetime):
-        """ERA5 via Open-Meteo for [start, end] (UTC dates), cached."""
-        path = os.path.join(DATA, "met", f"era5_{start:%Y%m%d}_{end:%Y%m%d}.npz")
+    def era5(cls, start: datetime, end: datetime, forecast=False):
+        """Hourly fields for [start, end] (UTC dates) via Open-Meteo, cached: ERA5 reanalysis for
+        replays, or the live forecast (which serves recent past days too) when forecast=True."""
+        kind = "fcst" if forecast else "era5"
+        path = os.path.join(DATA, "met", f"{kind}_{start:%Y%m%d}_{end:%Y%m%d}.npz")
+        api = ("https://api.open-meteo.com/v1/forecast" if forecast
+               else "https://archive-api.open-meteo.com/v1/era5")
         if not os.path.exists(path):
             lats = np.arange(LAT0, LAT0 + NY * D + MET_D, MET_D)
             lons = np.arange(LON0, LON0 + NX * D + MET_D, MET_D)
@@ -78,7 +82,7 @@ class Met:
             for i in range(0, len(pts), 50):
                 q = pts[i:i + 50]
                 for attempt in range(6):
-                    r = requests.get("https://archive-api.open-meteo.com/v1/era5", timeout=120, params=dict(
+                    r = requests.get(api, timeout=120, params=dict(
                         latitude=",".join(f"{x:.2f}" for x in q[:, 0]),
                         longitude=",".join(f"{x:.2f}" for x in q[:, 1]),
                         start_date=f"{start:%Y-%m-%d}", end_date=f"{end:%Y-%m-%d}", timezone="GMT",

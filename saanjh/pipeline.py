@@ -28,24 +28,32 @@ def scan_times(day, step_min=60):
     return morning, evening
 
 
-def fire_events(day, step_min=60, viirs=None):
-    """Fire events for one day: one row per GK-2A pixel that burned, with first/last detection,
-    peak and integrated energy, and whether the official polar-orbiter record could have counted it."""
-    lat, lon = gk2a.crop_grid()
-    area = gk2a.pixel_area_km2()
+def morning_base(day, read=gk2a.cached_bt):
+    """Per-pixel detector baseline from the day's 09:00-11:00 IST scans."""
+    return detect.baseline([(read("sw038", t), read("ir112", t)) for t in scan_times(day)[0]])
+
+
+def detect_scan(t, base, read=gk2a.cached_bt):
+    """Fire pixels in one scan as rows (i, j, t, frp, z); None if the scan is missing."""
+    b38, b112 = read("sw038", t), read("ir112", t)
+    if b38 is None or b112 is None:
+        return None
     elev = np.load(f"{smoke.DATA}/elevation_crop.npy")
-    morning, evening = scan_times(day, step_min)
-    base = detect.baseline([(gk2a.cached_bt("sw038", t), gk2a.cached_bt("ir112", t)) for t in morning])
-    rows = []
-    for t in evening:
-        b38, b112 = gk2a.cached_bt("sw038", t), gk2a.cached_bt("ir112", t)
-        if b38 is None or b112 is None:
-            continue
-        fire, z = detect.detect(b38, b112, base, (t + IST).hour, elev)
-        frp = detect.frp_mw(b38, area)
-        for i, j in zip(*np.nonzero(fire)):
-            rows.append(dict(i=i, j=j, t=t, frp=frp[i, j], z=z[i, j]))
-    d = pd.DataFrame(rows)
+    fire, z = detect.detect(b38, b112, base, (t + IST).hour, elev)
+    frp = detect.frp_mw(b38, gk2a.pixel_area_km2())
+    i, j = np.nonzero(fire)
+    return pd.DataFrame(dict(i=i, j=j, t=t, frp=frp[i, j], z=z[i, j]))
+
+
+def fire_events(day, step_min=60, viirs=None, detections=None):
+    """Fire events for one day: one row per GK-2A pixel that burned, with first/last detection,
+    peak and integrated energy, and whether the official polar-orbiter record could have counted it.
+    `detections` (rows from detect_scan) are computed from the local cache when not given."""
+    lat, lon = gk2a.crop_grid()
+    if detections is None:
+        base = morning_base(day)
+        detections = pd.concat([detect_scan(t, base) for t in scan_times(day, step_min)[1]])
+    d = detections
     if d.empty:
         return d
     dt_s = step_min * 60

@@ -9,3 +9,4 @@ pyproj
 matplotlib
 requests
 pytest
+moto[s3,sns]
