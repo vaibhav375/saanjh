@@ -148,12 +148,12 @@ footer a { color: inherit; }
         <button role="tab" id="t-off" aria-selected="false" aria-controls="p-off">Fires that matter tonight</button>
       </div>
       <div class="pane" id="p-res" role="tabpanel" aria-labelledby="t-res">
-        <p class="lede">Choose your town to see when farm smoke is expected and what schools should do.</p>
+        <p class="lede">Choose your town to see when farm-fire smoke is expected tonight and what schools can do.</p>
         <ul class="towns" id="towns"></ul>
         <div id="notice"></div>
       </div>
       <div class="pane" id="p-off" role="tabpanel" aria-labelledby="t-off" hidden>
-        <p class="lede">Ranked by how much smoke each fire puts into people's air over the next day, not by size. Send field teams and residue machines to the top of this list.</p>
+        <p class="lede">Fires Saanjh saw this afternoon and evening, ranked by how much smoke each puts into people's air over the next day, not by size. Send field teams and residue machines to the top of this list.</p>
         <table>
           <thead><tr><th>#</th><th>Near</th><th>First seen</th><th class="num">Share of exposure</th><th>Record</th></tr></thead>
           <tbody id="fires"></tbody>
@@ -199,7 +199,7 @@ function init() {
     `<span><b>${st.events}</b> fires seen</span>`,
     `<span><b>${st.counted}</b> burning when the satellites passed</span>`,
     `<span><b>${st.pm25_t} t</b> of PM2.5 released</span>`,
-    `<span>top 20 fires: <b>${Math.round(st.top20_harm_share * 100)}%</b> of the smoke people breathe</span>`].join("");
+    `<span><b>${(d.counted_cells || []).length}</b> fire cells already in the official count</span>`].join("");
   const start = d.frames.findIndex((_, k) => new Date(frameTime(k) + IST).getUTCHours() === 21);
   S.frame = start > 0 ? start : 0;
   buildTowns(); buildFires(); buildStrip(); sizeMap(); draw();
@@ -240,6 +240,9 @@ function draw() {
     ctx.strokeStyle = r.c === "PAK" ? "rgba(201,198,218,.18)" : "rgba(201,198,218,.34)";
     ctx.beginPath(); r.p.forEach(([x, y], i) => i ? ctx.lineTo(px(x), py(y)) : ctx.moveTo(px(x), py(y))); ctx.stroke();
   }
+  // fires the official count already has (VIIRS overpass), small and quiet
+  ctx.fillStyle = "rgba(214,169,63,.55)";
+  for (const [la, lo] of (d.counted_cells || [])) { ctx.beginPath(); ctx.arc(px(lo), py(la), 2.2, 0, 7); ctx.fill(); }
   // fires: lit only once first seen at the current frame time
   const now = frameTime(S.frame), tot = d.stats.harm_total;
   d.fires.forEach((fr, i) => {
@@ -352,20 +355,20 @@ function selectTown(name) {
   if (k >= 0) S.frame = k;
   buildTowns(); buildStrip(); draw();
 }
-const MSG = {
-  en: (t) => `Smoke from farm fires is expected over ${t.town} from about ${t.arrives_ist.slice(-5)}. It will be worst around ${t.peak_ist.slice(-5)}. Hold tomorrow's morning assembly indoors and keep windows shut overnight.`,
-  hi: (t) => `${t.town} में पराली के धुएँ का असर लगभग ${t.arrives_ist.slice(-5)} बजे से रहेगा, सबसे ज़्यादा ${t.peak_ist.slice(-5)} के आसपास। कल सुबह की प्रार्थना सभा अंदर करें और रात में खिड़कियाँ बंद रखें।`,
-  pa: (t) => `${t.town} ਵਿੱਚ ਪਰਾਲੀ ਦਾ ਧੂੰਆਂ ਲਗਭਗ ${t.arrives_ist.slice(-5)} ਵਜੇ ਤੋਂ ਆਵੇਗਾ, ਸਭ ਤੋਂ ਵੱਧ ${t.peak_ist.slice(-5)} ਦੇ ਨੇੜੇ। ਕੱਲ੍ਹ ਸਵੇਰ ਦੀ ਸਭਾ ਅੰਦਰ ਕਰੋ ਅਤੇ ਰਾਤ ਨੂੰ ਖਿੜਕੀਆਂ ਬੰਦ ਰੱਖੋ।`,
+const MSG = {  // says what the evidence supports: where and when farm smoke goes, not that the morning will be bad
+  en: (t) => `Farm-fire smoke is heading to ${t.town} tonight. It should arrive around ${t.arrives_ist.slice(-5)} and be heaviest around ${t.peak_ist.slice(-5)}. Before tomorrow's morning assembly, check the PM2.5 reading; if it is above 90, hold assembly indoors.`,
+  hi: (t) => `${t.town} की ओर आज रात पराली का धुआँ आ रहा है। यह लगभग ${t.arrives_ist.slice(-5)} बजे पहुँचेगा और ${t.peak_ist.slice(-5)} के आसपास सबसे ज़्यादा होगा। कल सुबह की प्रार्थना सभा से पहले PM2.5 देखें; 90 से ऊपर हो तो सभा अंदर करें।`,
+  pa: (t) => `${t.town} ਵੱਲ ਅੱਜ ਰਾਤ ਪਰਾਲੀ ਦਾ ਧੂੰਆਂ ਆ ਰਿਹਾ ਹੈ। ਇਹ ਲਗਭਗ ${t.arrives_ist.slice(-5)} ਵਜੇ ਪਹੁੰਚੇਗਾ ਅਤੇ ${t.peak_ist.slice(-5)} ਦੇ ਨੇੜੇ ਸਭ ਤੋਂ ਵੱਧ ਹੋਵੇਗਾ। ਕੱਲ੍ਹ ਸਵੇਰ ਦੀ ਸਭਾ ਤੋਂ ਪਹਿਲਾਂ PM2.5 ਵੇਖੋ; 90 ਤੋਂ ਵੱਧ ਹੋਵੇ ਤਾਂ ਸਭਾ ਅੰਦਰ ਕਰੋ।`,
 };
 function renderNotice() {
   const t = S.town && S.d.towns.find(t => t.town === S.town);
   if (!t) { $("#notice").innerHTML = ""; return; }
   const lv = level(t.peak_ugm3);
   if (lv === "low") { $("#notice").innerHTML = `<div class="notice" style="border-left-color:var(--muted)"><h3>${t.town}: little farm smoke expected</h3><p>Predicted farm-fire smoke stays under 10 µg/m³ of PM2.5. Other pollution sources still apply.</p></div>`; return; }
-  $("#notice").innerHTML = `<div class="notice" style="border-left-color:var(--${lv})"><h3>${t.town}: ${lv === "alert" ? "keep children indoors tomorrow morning" : "farm smoke expected tonight"}</h3>
+  $("#notice").innerHTML = `<div class="notice" style="border-left-color:var(--${lv})"><h3>${t.town}: ${lv === "alert" ? "heavy farm smoke heading here tonight" : "farm smoke expected tonight"}</h3>
     <div class="langs">${["en", "hi", "pa"].map(l => `<button type="button" data-l="${l}" aria-pressed="${S.lang === l}">${{ en: "English", hi: "हिन्दी", pa: "ਪੰਜਾਬੀ" }[l]}</button>`).join("")}</div>
     <p class="msg" lang="${S.lang}">${MSG[S.lang](t)}</p>
-    <p class="more">Farm smoke peak: +${t.peak_ugm3.toFixed(0)} µg/m³ PM2.5 · alerts go out above 25</p></div>`;
+    <p class="more">Farm smoke adds up to ~${t.peak_ugm3.toFixed(0)} µg/m³ PM2.5 at its peak (model estimate) · alerts go out above 25</p></div>`;
   $("#notice").querySelectorAll(".langs button").forEach(b => b.addEventListener("click", () => { S.lang = b.dataset.l; renderNotice(); }));
 }
 
@@ -373,7 +376,7 @@ function renderNotice() {
 function buildFires() {
   const tot = S.d.stats.harm_total, rows = S.d.fires.slice(0, S.showAll ? 50 : 20);
   $("#fires").innerHTML = rows.map((f, i) => `<tr data-i="${i}" aria-selected="${S.fire === i}" tabindex="0">
-      <td>${i + 1}</td><td>${f.near}</td><td>${f.first_ist}</td><td class="num">${(f.harm / tot * 100).toFixed(1)}%</td>
+      <td>${i + 1}</td><td>${f.near}</td><td>${f.source === "VIIRS" ? "by 13:30" : f.first_ist}</td><td class="num">${(f.harm / tot * 100).toFixed(1)}%</td>
       <td><span class="rec ${f.counted ? "counted" : "missed"}">${f.counted ? "Counted" : "Missed"}</span></td></tr>`).join("");
   $("#fires").querySelectorAll("tr").forEach(r => { r.addEventListener("click", () => selectFire(+r.dataset.i)); r.addEventListener("keydown", (e) => e.key === "Enter" && selectFire(+r.dataset.i)); });
   $("#morefires").textContent = S.showAll ? "Show top 20" : "Show all 50";
@@ -383,9 +386,11 @@ function selectFire(i) {
   S.fire = i; const f = S.d.fires[i], tot = S.d.stats.harm_total;
   const k = Math.round((firstSeenMs(f) - frameTime(0)) / 3600e3) + 6; if (k >= 0) S.frame = Math.min(k, S.frames.length - 1);
   buildFires(); draw();
-  const hours = f.scans > 1 ? `seen in ${f.scans} hourly images` : "seen in one hourly image";
-  $("#why").innerHTML = `<div class="why"><b>Why #${i + 1}:</b> near ${f.near}, first seen at ${f.first_ist} and ${hours}, releasing about ${Math.round(f.pm25_kg)} kg of PM2.5.
-    ${f.counted ? "The polar satellites saw it burning." : "<b>It started after the polar satellites passed, so the official count missed it.</b>"}
+  const seen = f.source === "VIIRS"
+    ? `seen by the polar satellites at their ~13:30 pass (fire power ${Math.round(f.frp_peak)} MW), estimated to release about ${Math.round(f.pm25_kg)} kg of PM2.5 over the day`
+    : `first seen by GK-2A at ${f.first_ist} and seen in ${f.scans} image${f.scans > 1 ? "s" : ""}, releasing about ${Math.round(f.pm25_kg)} kg of PM2.5`;
+  $("#why").innerHTML = `<div class="why"><b>Why #${i + 1}:</b> near ${f.near}, ${seen}.
+    ${f.counted ? "It is in the official count." : "<b>It started after the polar satellites passed, so the official count missed it.</b>"}
     Its smoke drifts into populated areas under tonight's shallow air layer, giving it ${(f.harm / tot * 100).toFixed(1)}% of all people-hours of farm smoke from today's fires.</div>`;
 }
 

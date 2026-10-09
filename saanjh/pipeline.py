@@ -99,21 +99,54 @@ def fire_events(day, step_min=60, viirs=None, detections=None):
     return ev
 
 
-def tonight(day, met, events, hours=30):
-    """Run every fire's smoke forward and rank. Each scan a fire was seen releases that scan's share
-    of its PM2.5 at that time. Returns (events with harm, town table, hourly concentration frames, t0)."""
-    if events.empty:
-        return events, pd.DataFrame(), None, None
+def overpass_sources(day, viirs):
+    """The inventory forecasts use today: VIIRS fires summed on the 0.05 deg model grid, released 09:00-19:00
+    IST with a midday-peaked profile (Gaussian, peak 13:30 IST, sigma 2 h). Returns one row per grid cell
+    and its hourly releases (row index, UTC time, kg PM2.5)."""
+    g = viirs.assign(cy=((viirs.latitude - smoke.LAT0) / smoke.D).astype(int),
+                     cx=((viirs.longitude - smoke.LON0) / smoke.D).astype(int))
+    cells = g.groupby(["cy", "cx"]).frp.sum().reset_index()
+    hours = np.arange(9, 20)
+    w = np.exp(-((hours + 0.5 - 13.5) ** 2) / (2 * 2.0 ** 2))
+    kg = np.outer(cells.frp, w) * 3600 * KG_PER_MJ * EF_PM25  # MW * s = MJ
+    src = pd.DataFrame(dict(lat=smoke.LAT0 + (cells.cy + 0.5) * smoke.D, lon=smoke.LON0 + (cells.cx + 0.5) * smoke.D,
+                            first=day + timedelta(hours=8), first_ist="13:30", scans=0, frp_peak=cells.frp,
+                            pm25_kg=kg.sum(1), counted=True, source="VIIRS"))
+    rel = pd.DataFrame(dict(row=np.repeat(src.index, len(hours)),
+                            t=np.tile([day + timedelta(hours=float(h) - 5.5) for h in hours], len(src)),
+                            kg=kg.ravel()))
+    return src, rel
+
+
+def _gk2a_releases(events):
+    """Each GK-2A fire event releases its PM2.5 evenly over the scans it was seen in."""
     reps = events.loc[events.index.repeat(events.scans)].copy()
     reps["k"] = reps.groupby(level=0).cumcount()
-    rel_t = reps["first"] + pd.to_timedelta(reps.k * (reps["last"] - reps["first"]).dt.total_seconds()
-                                            / np.maximum(reps.scans - 1, 1), unit="s")
-    t_h = np.array([smoke.hours_since(met, t.to_pydatetime()) for t in rel_t])
-    conc, expo = smoke.run(met, reps.lat.to_numpy(), reps.lon.to_numpy(), t_h,
-                           (reps.pm25_kg / reps.scans).to_numpy(), hours=hours, n_per=30)
-    events = events.copy()
-    events["harm"] = pd.Series(expo, index=reps.index).groupby(level=0).sum()
-    events = events.sort_values("harm", ascending=False)
+    t = reps["first"] + pd.to_timedelta(reps.k * (reps["last"] - reps["first"]).dt.total_seconds()
+                                        / np.maximum(reps.scans - 1, 1), unit="s")
+    return pd.DataFrame(dict(row=reps.index, t=t.to_numpy(), kg=(reps.pm25_kg / reps.scans).to_numpy()))
+
+
+def tonight(day, met, events, hours=30, viirs=None):
+    """Run the smoke forward and rank the fires. With `viirs`, the inventory is the hybrid that tested best
+    (results/NOTES.md, N4): the overpass inventory plus only the GK-2A fires it missed. Without it, all GK-2A
+    events. Returns (ranked sources with harm, town table, hourly concentration frames, t0)."""
+    if events.empty and (viirs is None or viirs.empty):
+        return events, pd.DataFrame(), None, None
+    if viirs is not None and len(viirs):
+        missed = events[~events.counted].assign(source="GK-2A") if len(events) else events
+        vsrc, vrel = overpass_sources(day, viirs)
+        src = pd.concat([missed.drop(columns=["i", "j"], errors="ignore"), vsrc], ignore_index=True)
+        rel = pd.concat([_gk2a_releases(src.iloc[:len(missed)]) if len(missed) else None,
+                         vrel.assign(row=vrel.row + len(missed))])
+    else:
+        src = events.assign(source="GK-2A").reset_index(drop=True)
+        rel = _gk2a_releases(src)
+    t_h = np.array([smoke.hours_since(met, pd.Timestamp(t).to_pydatetime()) for t in rel.t])
+    conc, expo = smoke.run(met, src.lat.to_numpy()[rel.row], src.lon.to_numpy()[rel.row], t_h,
+                           rel.kg.to_numpy(), hours=hours, n_per=30)
+    src["harm"] = pd.Series(expo).groupby(rel.row.to_numpy()).sum().reindex(src.index, fill_value=0.0)
+    src = src.sort_values("harm", ascending=False)
     t0 = met.t0 + timedelta(hours=float(t_h.min()))
     towns = []
     for name, (la, lo) in TOWNS.items():
@@ -122,7 +155,7 @@ def tonight(day, met, events, hours=30):
         over = np.nonzero(series > 0.25 * series.max())[0] if series.max() > 0 else []
         towns.append(dict(town=name, peak_ugm3=series.max(), peak_ist=f"{t0 + timedelta(hours=k_peak) + IST:%a %H:%M}",
                           arrives_ist=f"{t0 + timedelta(hours=int(over[0])) + IST:%a %H:%M}" if len(over) else ""))
-    return events, pd.DataFrame(towns).sort_values("peak_ugm3", ascending=False), conc, t0
+    return src, pd.DataFrame(towns).sort_values("peak_ugm3", ascending=False), conc, t0
 
 
 def _frames(conc, factor=2):
@@ -133,23 +166,34 @@ def _frames(conc, factor=2):
     return [base64.b64encode(f.tobytes()).decode() for f in q]
 
 
-def summary(day, ev, towns, conc, t0, n_scans, replay=False):
-    """The JSON the web page reads (tonight.json / results/<day>.json)."""
-    near = {}
-    for k, r in ev.head(50).iterrows():
-        name, (la, lo) = min(TOWNS.items(), key=lambda kv: (kv[1][0] - r.lat) ** 2 + (kv[1][1] - r.lon) ** 2)
-        near[k] = f"{name} {np.hypot((la - r.lat) * 111, (lo - r.lon) * 96):.0f} km"
-    fires = ev.head(50).assign(near=pd.Series(near))
+def summary(day, ranked, towns, conc, t0, n_scans, replay=False, events=None):
+    """The JSON the web page reads (tonight.json / results/<day>.json). `ranked` is tonight()'s output;
+    `events` (all GK-2A fire events) feeds the counted/missed statistics when the hybrid inventory is used."""
+    ev = events if events is not None else ranked
+    # The officer list ranks the fires Saanjh saw (burning this afternoon and evening); fires already in the
+    # official count still shape the smoke and appear on the map as `counted_cells`.
+    gk_ranked = ranked[ranked.get("source", pd.Series("GK-2A", index=ranked.index)) == "GK-2A"]
+    counted_cells = ranked[ranked.get("source", pd.Series("", index=ranked.index)) == "VIIRS"]
+    top = gk_ranked.head(50).copy()
+    top["near"] = [f"{n} {np.hypot((la - r.lat) * 111, (lo - r.lon) * 96):.0f} km"
+                   for r in top.itertuples()
+                   for n, (la, lo) in [min(TOWNS.items(), key=lambda kv: (kv[1][0] - r.lat) ** 2 + (kv[1][1] - r.lon) ** 2)]]
+    if "source" not in top:
+        top["source"] = "GK-2A"
+    gk = ev[ev.get("source", pd.Series("GK-2A", index=ev.index)) == "GK-2A"] if len(ev) else ev
+    fre = gk.fre_mj.sum() if len(gk) else 0
     return dict(
         day=f"{day:%Y-%m-%d}", generated=f"{datetime.now(timezone.utc):%Y-%m-%dT%H:%MZ}", scans=n_scans, replay=replay,
-        stats=dict(events=len(ev), counted=int(ev.counted.sum()),
-                   uncounted_energy_share=round(float(ev.fre_mj[~ev.counted].sum() / ev.fre_mj.sum()), 3),
-                   fre_mj=round(float(ev.fre_mj.sum())), pm25_t=round(float(ev.pm25_kg.sum()) / 1000, 1),
-                   top20_harm_share=round(float(ev.harm.head(20).sum() / ev.harm.sum()), 3),
-                   harm_total=float(ev.harm.sum()),
-                   first_seen=ev.groupby("first_ist").size().to_dict()),
-        fires=json.loads(fires[["lat", "lon", "near", "first_ist", "scans", "frp_peak", "pm25_kg", "counted", "harm"]]
+        stats=dict(events=len(gk), counted=int(gk.counted.sum()) if len(gk) else 0,
+                   uncounted_energy_share=round(float(gk.fre_mj[~gk.counted].sum() / fre), 3) if fre else 0.0,
+                   fre_mj=round(float(fre)), pm25_t=round(float(ranked.pm25_kg.sum()) / 1000, 1),
+                   top20_harm_share=round(float(gk_ranked.harm.head(20).sum() / ranked.harm.sum()), 3),
+                   missed_harm_share=round(float(gk_ranked.harm.sum() / ranked.harm.sum()), 3),
+                   harm_total=float(ranked.harm.sum()),
+                   first_seen=gk.groupby("first_ist").size().to_dict() if len(gk) else {}),
+        fires=json.loads(top[["lat", "lon", "near", "first_ist", "scans", "frp_peak", "pm25_kg", "counted", "harm", "source"]]
                          .round(3).to_json(orient="records")),
+        counted_cells=counted_cells[["lat", "lon"]].round(3).to_numpy().tolist(),
         towns=json.loads(towns.round(1).to_json(orient="records")),
         grid=dict(lat0=smoke.LAT0, lon0=smoke.LON0, d=smoke.D * 2, ny=smoke.NY // 2, nx=smoke.NX // 2,
                   t0=f"{t0:%Y-%m-%dT%H:%MZ}", scale="ug/m3 = 10**((v-150)/50)"),

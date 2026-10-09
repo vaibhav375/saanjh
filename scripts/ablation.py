@@ -41,17 +41,10 @@ def add(name, conc, t0):
 
 
 def overpass_inventory(v, day):
-    """VIIRS fires on the 0.05 deg grid, released 09-19 IST with a midday-peaked profile."""
-    g = v.assign(cy=((v.latitude - smoke.LAT0) / smoke.D).astype(int), cx=((v.longitude - smoke.LON0) / smoke.D).astype(int))
-    cells = g.groupby(["cy", "cx"]).frp.sum().reset_index()
-    lat, lon, t, m = [], [], [], []
-    for h in range(9, 20):
-        w = np.exp(-((h + 0.5 - 13.5) ** 2) / (2 * 2.0 ** 2))
-        lat += list(smoke.LAT0 + (cells.cy + 0.5) * smoke.D)
-        lon += list(smoke.LON0 + (cells.cx + 0.5) * smoke.D)
-        t += [smoke.hours_since(met, day + timedelta(hours=h - 5.5))] * len(cells)
-        m += list(cells.frp * w * 3600 * pipeline.KG_PER_MJ * pipeline.EF_PM25)  # MW*s = MJ
-    return np.array(lat), np.array(lon), np.array(t), np.array(m)
+    """Inventory A: the same overpass inventory the live system uses (pipeline.overpass_sources)."""
+    src, rel = pipeline.overpass_sources(day, v)
+    t = np.array([smoke.hours_since(met, pd.Timestamp(x).to_pydatetime()) for x in rel.t])
+    return src.lat.to_numpy()[rel.row], src.lon.to_numpy()[rel.row], t, rel.kg.to_numpy()
 
 
 if "--eval" not in sys.argv:

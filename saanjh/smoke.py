@@ -145,9 +145,10 @@ def run(met: Met, lat, lon, t_rel, mass_kg, hours=36, n_per=40, dt_min=15, seed=
     conc = np.zeros((n_out, NY, NX))
     expo = np.zeros(len(lat))
     sig = np.sqrt(2 * K_H * dt_s)
+    gone = np.zeros(len(m), bool)  # left the model area: no population there, and winds are extrapolated
     for k in range(steps + 1):
         t = t_start + k * dt_h
-        live = (trel <= t) & (t < trel + hours)
+        live = (trel <= t) & (t < trel + hours) & ~gone
         if k % int(round(out_every_h / dt_h)) == 0 and live.any():
             iy = ((plat[live] - LAT0) / D).astype(int)
             ix = ((plon[live] - LON0) / D).astype(int)
@@ -165,6 +166,7 @@ def run(met: Met, lat, lon, t_rel, mass_kg, hours=36, n_per=40, dt_min=15, seed=
         la = la + (v2 * dt_s + rng.normal(0, sig, la.shape)) / 110570.0
         lo = lo + (u2 * dt_s + rng.normal(0, sig, la.shape)) / (111320.0 * np.cos(np.radians(la)))
         plat[live], plon[live] = la, lo
+        gone[live] = ~((la > LAT0) & (la < LAT0 + NY * D) & (lo > LON0) & (lo < LON0 + NX * D))
         _, _, blh = met.at(np.full(la.shape, t + dt_h), la, lo)
         hp[live] = np.maximum(hp[live], blh)
     return conc, expo

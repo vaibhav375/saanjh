@@ -122,10 +122,11 @@ def model_handler(event, _ctx=None):
     if det.empty:
         return {"day": f"{day:%Y-%m-%d}", "events": 0}
     step = int(np.median(np.diff(np.sort(det.t.unique()))) / np.timedelta64(1, "m")) if det.t.nunique() > 1 else 60
-    ev = pipeline.fire_events(day, step_min=step, viirs=_viirs(day, replay), detections=det)
+    viirs = _viirs(day, replay)
+    ev = pipeline.fire_events(day, step_min=step, viirs=viirs, detections=det)
     met = smoke.Met.era5(day - timedelta(days=1), day + timedelta(days=2), forecast=not replay)
-    ev, towns, conc, t0 = pipeline.tonight(day, met, ev)
-    out = pipeline.summary(day, ev, towns, conc, t0, n_scans, replay)
+    ranked, towns, conc, t0 = pipeline.tonight(day, met, ev, viirs=viirs)
+    out = pipeline.summary(day, ranked, towns, conc, t0, n_scans, replay, events=ev)
     body = json.dumps(out, separators=(",", ":"))
     if replay:
         _put(f"results/{day:%Y%m%d}.json", body)
@@ -146,10 +147,13 @@ def _alert(day, towns):
         return  # already sent tonight
     except s3.exceptions.ClientError:
         pass
-    lines = [f"{r.town}: farm smoke from about {r.arrives_ist}, worst around {r.peak_ist} "
-             f"(+{r.peak_ugm3:.0f} ug/m3 PM2.5)" for r in hit.itertuples()]
-    boto3.client("sns").publish(TopicArn=ALERT_TOPIC, Subject="Saanjh: farm smoke expected tonight",
-                                Message="\n".join(lines) + "\n\nSchools: keep tomorrow's morning assembly indoors.")
+    lines = [f"{r.town}: arrives around {r.arrives_ist}, heaviest around {r.peak_ist} "
+             f"(farm smoke adds ~{r.peak_ugm3:.0f} ug/m3 PM2.5, model estimate)" for r in hit.itertuples()]
+    boto3.client("sns").publish(
+        TopicArn=ALERT_TOPIC, Subject="Saanjh: farm-fire smoke heading your way tonight",
+        Message="Farm-fire smoke is heading to these towns tonight:\n" + "\n".join(lines)
+        + "\n\nSchools: before tomorrow's morning assembly, check the local PM2.5 reading "
+        "(CPCB Sameer app); if it is above 90, hold assembly indoors.\nMap: " + os.environ.get("SITE_URL", ""))
     _put(marker, "\n".join(lines), ctype="text/plain")
 
 

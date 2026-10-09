@@ -89,6 +89,9 @@ Resources:
       Handler: saanjh.aws.model_handler
       MemorySize: 3008
       Timeout: 900
+      Environment:
+        Variables:
+          SITE_URL: !GetAtt SiteFnUrl.FunctionUrl
       Policies:
         - S3CrudPolicy: {BucketName: !Ref DataBucket}
         - S3CrudPolicy: {BucketName: !Ref SiteBucket}
