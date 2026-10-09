@@ -33,9 +33,9 @@ We report that limit rather than hide it.
 NOAA GK-2A bucket (us-east-1) ──SNS NewGK2AObject──▶ SQS ──▶ Lambda: detect (reads one 4 MB HDF5 chunk per band)
                                                                │
                                                                ▼
-EventBridge Scheduler (hourly, 12:35–00:35 IST) ──▶ Lambda: fire events → smoke model → tonight.json ──▶ S3 ──▶ CloudFront page
+EventBridge Scheduler (hourly, 12:35–00:35 IST) ──▶ Lambda: fire events → smoke model → tonight.json ──▶ S3 ──▶ Lambda Function URL page
                                                                └──▶ SNS smoke alerts
-Step Functions Map (40 days in parallel) ──▶ the same Lambdas over NOAA's archive  →  season replays
+Step Functions Map (8 days in parallel) ──▶ the same Lambdas over NOAA's archive  →  season replays
 ```
 
 Everything is in [template.yaml](template.yaml) (AWS SAM). The Lambdas run next to NOAA's bucket, which
@@ -49,7 +49,7 @@ matters: from a laptop in India each crop takes ~17 s to download; in us-east-1 
 | `saanjh/detect.py` | Fire detector (contextual 3.8–11.2 µm anomaly, morning-normalised noise, cloud-edge and plains masks) and FRP |
 | `saanjh/smoke.py` | Lagrangian smoke model on ERA5 / forecast winds with residual-layer mixing; WorldPop exposure |
 | `saanjh/pipeline.py` | One evening end to end: fire events, counted vs missed, ranking, town arrival times, page JSON |
-| `saanjh/aws.py` | Lambda handlers (live SQS, day replay, hourly model, alerts) |
+| `saanjh/aws.py` | Lambda handlers (live SQS, day replay, hourly model, alerts, the page) |
 | `site/` | The public page and officer console (static, reads `tonight.json`) |
 | `scripts/` | Data fetchers, scoring against VIIRS, dusk-penalty experiment, packaging |
 | `PLAN.md` | Plan of record and the research behind the track choice |

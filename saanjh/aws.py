@@ -139,3 +139,30 @@ def _alert(day, towns):
     boto3.client("sns").publish(TopicArn=ALERT_TOPIC, Subject="Saanjh: farm smoke expected tonight",
                                 Message="\n".join(lines) + "\n\nSchools: keep tomorrow's morning assembly indoors.")
     _put(marker, "\n".join(lines), ctype="text/plain")
+
+
+STATIC = os.path.join(os.path.dirname(__file__), "..", "site")
+TYPES = {".html": "text/html; charset=utf-8", ".json": "application/json"}
+
+
+def site_handler(event, _ctx=None):
+    """Function URL: the page and borders from the package, tonight.json from the site bucket,
+    or a replayed day's results with ?day=YYYY-MM-DD."""
+    path = event.get("rawPath", "/").lstrip("/") or "index.html"
+    q = event.get("queryStringParameters") or {}
+    try:
+        if path == "tonight.json":
+            day = q.get("day", "")
+            if re.fullmatch(r"\d{4}-\d{2}-\d{2}", day):
+                body = s3.get_object(Bucket=BUCKET, Key=f"results/{day.replace('-', '')}.json")["Body"].read()
+            else:
+                body = s3.get_object(Bucket=SITE, Key="tonight.json")["Body"].read()
+            return dict(statusCode=200, headers={"Content-Type": TYPES[".json"], "Cache-Control": "max-age=60"},
+                        body=body.decode())
+        if path in ("index.html", "borders.json"):
+            with open(os.path.join(STATIC, path), encoding="utf-8") as f:
+                return dict(statusCode=200, headers={"Content-Type": TYPES[os.path.splitext(path)[1]],
+                                                     "Cache-Control": "max-age=300"}, body=f.read())
+    except s3.exceptions.NoSuchKey:
+        pass
+    return dict(statusCode=404, headers={"Content-Type": "text/plain"}, body="Not found")

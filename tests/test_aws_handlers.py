@@ -45,3 +45,23 @@ def test_live_message_parsing(monkeypatch):
     msg = lambda k: {"body": json.dumps({"Message": json.dumps({"Records": [{"s3": {"object": {"key": k}}}]})})}
     aws.detect_handler({"Records": [msg(key), msg(other)]})
     assert [t.strftime("%Y%m%d%H%M") for t in seen] == ["202610091100"]
+
+
+@mock_aws
+def test_site_serves_page_live_json_and_replays(monkeypatch):
+    monkeypatch.setenv("AWS_DEFAULT_REGION", "us-east-1")
+    from saanjh import aws
+    s3 = boto3.client("s3")
+    for b in ("data-b", "site-b"):
+        s3.create_bucket(Bucket=b)
+    s3.put_object(Bucket="site-b", Key="tonight.json", Body=b'{"live": 1}')
+    s3.put_object(Bucket="data-b", Key="results/20241118.json", Body=b'{"replay": 1}')
+    monkeypatch.setattr(aws, "s3", s3)
+    monkeypatch.setattr(aws, "BUCKET", "data-b")
+    monkeypatch.setattr(aws, "SITE", "site-b")
+    assert "<title>Saanjh" in aws.site_handler({"rawPath": "/"})["body"]
+    assert aws.site_handler({"rawPath": "/tonight.json"})["body"] == '{"live": 1}'
+    r = aws.site_handler({"rawPath": "/tonight.json", "queryStringParameters": {"day": "2024-11-18"}})
+    assert r["body"] == '{"replay": 1}'
+    assert aws.site_handler({"rawPath": "/tonight.json", "queryStringParameters": {"day": "../x"}})["body"] == '{"live": 1}'
+    assert aws.site_handler({"rawPath": "/../template.yaml"})["statusCode"] == 404

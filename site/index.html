@@ -167,7 +167,7 @@ footer a { color: inherit; }
   <footer>
     <div><h4>How this works</h4><p>Every 10 minutes the Korean GK-2A satellite images Punjab and Haryana. Saanjh finds fires in each image, follows their smoke with forecast winds and the height of the night-time air layer, and adds it up over where people live.</p></div>
     <div><h4>What it doesn't do</h4><p>It works on a 2–4 km grid and never names farmers or plots. Small fires under about 10 MW are often too faint to see. Smoke levels show the farm-fire share only, not total pollution.</p></div>
-    <div><h4>Data</h4><p>GK-2A (KMA, via NOAA Open Data on AWS) · VIIRS active fires (NASA FIRMS) · ERA5 and forecasts (Open-Meteo) · WorldPop 2020 · geoBoundaries. Built on AWS Lambda, Step Functions, S3, CloudFront.</p></div>
+    <div><h4>Data</h4><p>GK-2A (KMA, via NOAA Open Data on AWS) · VIIRS active fires (NASA FIRMS) · ERA5 and forecasts (Open-Meteo) · WorldPop 2020 · geoBoundaries. Built on AWS Lambda, Step Functions, SQS, SNS, S3.</p></div>
   </footer>
 </div>
 
@@ -184,7 +184,7 @@ const frameTime = (k) => Date.parse(S.d.grid.t0) + k * 3600e3;
 const level = (p) => p >= 25 ? "alert" : p >= 10 ? "watch" : "low";
 const LEVEL = { alert: "Alert", watch: "Watch", low: "Low" };
 
-Promise.all([fetch("tonight.json").then(r => r.json()), fetch("borders.json").then(r => r.json())])
+Promise.all([fetch("tonight.json" + location.search).then(r => r.json()), fetch("borders.json").then(r => r.json())])
   .then(([d, b]) => { S.d = d; S.borders = b; S.frames = d.frames.map(decode); init(); })
   .catch(() => { $("#thesis").textContent = "Tonight's data hasn't been published yet. It updates every hour from 12:30 IST."; });
 

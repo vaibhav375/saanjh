@@ -116,7 +116,7 @@ Resources:
           Days:
             Type: Map
             ItemsPath: $.days
-            MaxConcurrency: 40
+            MaxConcurrency: 8  # new accounts often allow only 10 concurrent Lambda runs
             ItemProcessor:
               StartAt: Detect
               States:
@@ -127,7 +127,9 @@ Resources:
                     FunctionName: !Ref DetectFn
                     Payload: {"day.$": "$.day", "step_min.$": "$.step_min"}
                   ResultPath: $.detect
-                  Retry: [{ErrorEquals: [States.ALL], MaxAttempts: 2, IntervalSeconds: 5}]
+                  Retry:
+                    - {ErrorEquals: [Lambda.TooManyRequestsException], MaxAttempts: 8, IntervalSeconds: 10, BackoffRate: 2}
+                    - {ErrorEquals: [States.ALL], MaxAttempts: 2, IntervalSeconds: 5}
                   Next: Model
                 Model:
                   Type: Task
@@ -136,50 +138,28 @@ Resources:
                     FunctionName: !Ref ModelFn
                     Payload: {"day.$": "$.day", "replay": true}
                   OutputPath: $.Payload
-                  Retry: [{ErrorEquals: [States.ALL], MaxAttempts: 2, IntervalSeconds: 30}]
+                  Retry:
+                    - {ErrorEquals: [Lambda.TooManyRequestsException], MaxAttempts: 8, IntervalSeconds: 10, BackoffRate: 2}
+                    - {ErrorEquals: [States.ALL], MaxAttempts: 2, IntervalSeconds: 30}
                   End: true
             End: true
 
-  # Public page: private bucket behind CloudFront.
-  SiteOAC:
-    Type: AWS::CloudFront::OriginAccessControl
+  # Public page over HTTPS from a Lambda Function URL (new accounts can't create CloudFront until verified).
+  SiteFn:
+    Type: AWS::Serverless::Function
     Properties:
-      OriginAccessControlConfig:
-        Name: !Sub "${AWS::StackName}-site"
-        OriginAccessControlOriginType: s3
-        SigningBehavior: always
-        SigningProtocol: sigv4
-  SiteCdn:
-    Type: AWS::CloudFront::Distribution
-    Properties:
-      DistributionConfig:
-        Enabled: true
-        DefaultRootObject: index.html
-        Origins:
-          - Id: site
-            DomainName: !GetAtt SiteBucket.RegionalDomainName
-            OriginAccessControlId: !GetAtt SiteOAC.Id
-            S3OriginConfig: {OriginAccessIdentity: ""}
-        DefaultCacheBehavior:
-          TargetOriginId: site
-          ViewerProtocolPolicy: redirect-to-https
-          CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad  # Managed-CachingDisabled: tonight.json changes hourly
-  SiteBucketPolicy:
-    Type: AWS::S3::BucketPolicy
-    Properties:
-      Bucket: !Ref SiteBucket
-      PolicyDocument:
-        Statement:
-          - Effect: Allow
-            Principal: {Service: cloudfront.amazonaws.com}
-            Action: s3:GetObject
-            Resource: !Sub "${SiteBucket.Arn}/*"
-            Condition:
-              StringEquals: {AWS:SourceArn: !Sub "arn:aws:cloudfront::${AWS::AccountId}:distribution/${SiteCdn}"}
+      Handler: saanjh.aws.site_handler
+      MemorySize: 512
+      Timeout: 15
+      Policies:
+        - S3ReadPolicy: {BucketName: !Ref SiteBucket}
+        - S3ReadPolicy: {BucketName: !Ref DataBucket}
+      FunctionUrlConfig:
+        AuthType: NONE
 
 Outputs:
   SiteUrl:
-    Value: !Sub "https://${SiteCdn.DomainName}"
+    Value: !GetAtt SiteFnUrl.FunctionUrl
   DataBucket:
     Value: !Ref DataBucket
   SiteBucket:
