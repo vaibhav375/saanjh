@@ -81,3 +81,21 @@ Both seasons were re-run in the cloud with the frozen detector; 2025 was never u
 
 OpenAQ has no CPCB station data for 2023–2024 (old sensor ids end Oct 2022, new ones start 2025), so the
 PM2.5 tests (N4, N5) use the 2025 season only.
+
+## Both seasons with the frozen detector (cloud replays, every 10-minute image, 15 Oct – 30 Nov)
+
+| Season | Fire events | Fire energy | PM2.5 (from detected energy) | Energy from fires started after the overpass |
+| --- | --- | --- | --- | --- |
+| 2024 (tuning) | 38,908 | 1,090 TJ | 2,510 t | **90.9%** |
+| 2025 (held out) | 46,203 | 1,510 TJ | 3,478 t | **95.1%** (95.0% without 18–21 Oct) |
+
+Official polar-orbiter counts called 2025 a low year; the fire energy GK-2A sees was 39% higher than 2024.
+Treat as indicative: detection depends on clouds and haze, and 18–21 Oct 2025 contains false alarms (below).
+
+## N2 held out on 2025 (`eval_pod.py ... --cloud`, 46 days, frozen threshold)
+
+Probability of detection by summed VIIRS FRP per pixel: 3% (<5 MW), 7% (5–10), 11% (10–20), 24% (20–40),
+43% (40–80), 37% (>80 MW, n=41): the same curve as 2024. Unmatched detections: 53% over all days, **34%
+excluding 18–21 Oct 2025**, when weak (~5 MW) detections scattered 30–50 km from any VIIRS fire across the
+region (not a navigation offset: no consistent shift). Cause not yet diagnosed; those days are 5.9% of the
+season's detected energy. Median unmatched per day: 3 (2025) vs 4 (2024).
