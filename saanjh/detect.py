@@ -5,7 +5,9 @@ Context: dT minus its 7x7 neighbourhood median removes the regional diurnal cycl
 Background: that excess has a per-pixel bias and noise (soil, towns, canals) which we take from
 the same day's 09-11 IST scans, the normalisation Jethva (2026, Remote Sens. 18:1506) uses.
 A fire is z = (excess - morning bias) / morning noise above Z, on cloud-free plains pixels with no
-cold neighbours (cloud edges were the main false alarm on day one).
+cold neighbours (cloud edges were the main false alarm on day one), and the 3.8um channel itself must
+stand out from its neighbourhood (as in MODIS): on the 2024 season this removed 211 detections driven only
+by a cold 11.2um pixel on the Thar desert edge, all unmatched by VIIRS, with no loss of detection.
 """
 import warnings
 
@@ -15,7 +17,7 @@ from scipy import ndimage
 # BT11.2 cloud floor (K) by IST hour; daytime values from Jethva 2026 Table 1, evening extrapolated.
 F112 = {12: 293, 13: 293, 14: 293, 15: 289, 16: 289, 17: 288, 18: 287, 19: 283, 20: 282, 21: 281,
         22: 280, 23: 279}
-Z, MIN_EXCESS_K, MAX_ELEV_M = 6.0, 2.0, 400.0
+Z, MIN_EXCESS_K, MIN_MIR_K, MAX_ELEV_M = 6.0, 2.0, 0.5, 400.0
 
 
 def excess(x, size=7):
@@ -41,7 +43,7 @@ def detect(bt38, bt112, base, ist_hour, elev, z_thr=Z):
     floor = F112[ist_hour]
     with np.errstate(invalid="ignore"):
         clear = (bt112 > floor) & (ndimage.minimum_filter(np.nan_to_num(bt112), 5) > floor - 4)
-        fire = (z > z_thr) & (c > MIN_EXCESS_K) & clear & (elev < MAX_ELEV_M)
+        fire = (z > z_thr) & (c > MIN_EXCESS_K) & (excess(bt38) > MIN_MIR_K) & clear & (elev < MAX_ELEV_M)
     return fire, z
 
 

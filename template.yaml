@@ -8,6 +8,12 @@ Parameters:
     Default: ""
     Description: Optional email to subscribe to smoke alerts (confirm the email AWS sends).
 
+  FirmsMapKey:
+    Type: String
+    Default: ""
+    NoEcho: true
+    Description: NASA FIRMS MAP_KEY, used to mark tonight's fires the polar satellites counted.
+
 Conditions:
   HasEmail: !Not [!Equals [!Ref AlertEmail, ""]]
 
@@ -22,6 +28,7 @@ Globals:
         DATA_BUCKET: !Ref DataBucket
         SITE_BUCKET: !Ref SiteBucket
         ALERT_TOPIC_ARN: !Ref AlertTopic
+        FIRMS_MAP_KEY: !Ref FirmsMapKey
 
 Resources:
   DataBucket:

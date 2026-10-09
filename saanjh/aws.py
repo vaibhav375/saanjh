@@ -94,7 +94,19 @@ def _detections(day):
     return pd.concat(frames) if frames else pd.DataFrame(), len(keys)
 
 
-def _viirs(day):
+def _viirs(day, replay=True):
+    """VIIRS fires for the day: archive copy in S3 for replays, FIRMS near-real-time for live runs."""
+    key = os.environ.get("FIRMS_MAP_KEY")
+    if not replay and key:
+        import requests
+        frames = []
+        for src in ("VIIRS_SNPP_NRT", "VIIRS_NOAA20_NRT", "VIIRS_NOAA21_NRT"):
+            r = requests.get(f"https://firms.modaps.eosdis.nasa.gov/api/area/csv/{key}/{src}/71,26,81,34/1/{day:%Y-%m-%d}",
+                             timeout=60)
+            if r.ok and r.text.startswith("latitude"):
+                frames.append(pd.read_csv(io.StringIO(r.text)))
+        v = pd.concat(frames) if frames else pd.DataFrame()
+        return v[v.daynight == "D"] if len(v) else None
     try:
         v = pd.read_csv(io.BytesIO(s3.get_object(Bucket=BUCKET, Key="viirs/punjab_both.csv")["Body"].read()))
         return v[v.acq_date == f"{day:%Y-%m-%d}"]
@@ -110,7 +122,7 @@ def model_handler(event, _ctx=None):
     if det.empty:
         return {"day": f"{day:%Y-%m-%d}", "events": 0}
     step = int(np.median(np.diff(np.sort(det.t.unique()))) / np.timedelta64(1, "m")) if det.t.nunique() > 1 else 60
-    ev = pipeline.fire_events(day, step_min=step, viirs=_viirs(day), detections=det)
+    ev = pipeline.fire_events(day, step_min=step, viirs=_viirs(day, replay), detections=det)
     met = smoke.Met.era5(day - timedelta(days=1), day + timedelta(days=2), forecast=not replay)
     ev, towns, conc, t0 = pipeline.tonight(day, met, ev)
     out = pipeline.summary(day, ev, towns, conc, t0, n_scans, replay)

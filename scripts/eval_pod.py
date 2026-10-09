@@ -7,6 +7,8 @@ per-pixel FRP bin, and the share of GK-2A detections with no VIIRS fire nearby (
 false alarms: VIIRS misses some fires too).
 
 usage: eval_pod.py viirs.csv out_prefix [z_thr ...]
+       eval_pod.py viirs.csv out_prefix --cloud    (score the detections the AWS replay wrote to
+                                                    data/detections/, at the frozen threshold)
 """
 import os
 import sys
@@ -21,7 +23,8 @@ from saanjh import detect, gk2a
 
 viirs = pd.read_csv(sys.argv[1])
 out = sys.argv[2]
-z_list = [float(z) for z in sys.argv[3:]] or [detect.Z]
+CLOUD = "--cloud" in sys.argv
+z_list = [float(z) for z in sys.argv[3:] if z != "--cloud"] or [detect.Z]
 lat, lon = gk2a.crop_grid()
 elev = np.load("data/elevation_crop.npy")
 grid = cKDTree(np.c_[lat.ravel(), lon.ravel()])
@@ -33,21 +36,34 @@ for day_s, v in viirs.groupby("acq_date"):
     hhmm = int(v.acq_time.median())
     t0 = day + timedelta(hours=hhmm // 100, minutes=hhmm % 100 // 10 * 10)
     morning = [day + timedelta(hours=3, minutes=30 + 30 * i) for i in range(5)]
-    scans = [(gk2a.cached_bt("sw038", t), gk2a.cached_bt("ir112", t))
-             for t in morning + [t0, t0 + timedelta(minutes=10)]] if all(
-        os.path.exists(os.path.join(gk2a.CACHE, "_".join(map(str, gk2a.WIN)), f"{b}_{t:%Y%m%d%H%M}.npy"))
-        for t in morning + [t0, t0 + timedelta(minutes=10)] for b in ("sw038", "ir112")) else None
-    if scans is None:
-        continue
-    base = detect.baseline(scans[:5])
+    pair = [t0, t0 + timedelta(minutes=10)]
+    if CLOUD:
+        paths = [f"data/detections/{t:%Y%m%d}/{t:%H%M}.csv" for t in pair]
+        if not all(os.path.exists(p) for p in paths):
+            continue
+        cloud_det = np.zeros(lat.shape, bool)
+        for p in paths:
+            d = pd.read_csv(p)
+            cloud_det[d.i, d.j] = True
+    else:
+        scans = [(gk2a.cached_bt("sw038", t), gk2a.cached_bt("ir112", t))
+                 for t in morning + pair] if all(
+            os.path.exists(os.path.join(gk2a.CACHE, "_".join(map(str, gk2a.WIN)), f"{b}_{t:%Y%m%d%H%M}.npy"))
+            for t in morning + pair for b in ("sw038", "ir112")) else None
+        if scans is None:
+            continue
+        base = detect.baseline(scans[:5])
     ist_hour = (t0 + timedelta(hours=5, minutes=30)).hour
     _, idx = grid.query(np.c_[v.latitude, v.longitude])
     frp = np.bincount(idx, weights=v.frp, minlength=lat.size).reshape(lat.shape)
     plains = elev < detect.MAX_ELEV_M
     for z_thr in z_list:
-        det = np.zeros(lat.shape, bool)
-        for b38, b112 in scans[5:]:
-            det |= detect.detect(b38, b112, base, ist_hour, elev, z_thr)[0]
+        if CLOUD:
+            det = cloud_det
+        else:
+            det = np.zeros(lat.shape, bool)
+            for b38, b112 in scans[5:]:
+                det |= detect.detect(b38, b112, base, ist_hour, elev, z_thr)[0]
         hit = ndimage.binary_dilation(det)  # within one pixel of a detection
         near_fire = ndimage.binary_dilation(frp > 0)
         for lo, hi in zip(BINS[:-1], BINS[1:]):
