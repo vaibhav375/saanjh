@@ -183,6 +183,14 @@ def site_handler(event, _ctx=None):
                 body = s3.get_object(Bucket=SITE, Key="tonight.json")["Body"].read()
             return dict(statusCode=200, headers={"Content-Type": TYPES[".json"], "Cache-Control": "max-age=60"},
                         body=body.decode())
+        if path == "days.json":  # replay days available, for the date picker
+            keys = [o["Key"] for p in s3.get_paginator("list_objects_v2").paginate(Bucket=BUCKET, Prefix="results/")
+                    for o in p.get("Contents", [])]
+            fmt = lambda k: f"{k[:4]}-{k[4:6]}-{k[6:8]}"
+            days = sorted(fmt(k[8:16]) for k in keys if re.fullmatch(r"results/\d{8}\.json", k))
+            plans = sorted(fmt(k[13:21]) for k in keys if re.fullmatch(r"results/plan_\d{8}\.json", k))
+            return dict(statusCode=200, headers={"Content-Type": TYPES[".json"], "Cache-Control": "max-age=600"},
+                        body=json.dumps({"replays": days, "plans": plans}))
         if path == "config.json":
             return dict(statusCode=200, headers={"Content-Type": TYPES[".json"]},
                         body=json.dumps({"agent_url": os.environ.get("AGENT_URL", "")}))

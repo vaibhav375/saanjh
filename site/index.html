@@ -2,696 +2,839 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Saanjh · Tonight's farm smoke</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Saanjh · Evening farm-fire watch</title>
+<meta name="description" content="Fires India's official count misses, where their smoke goes tonight, and where to send field teams before dusk.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Anek+Latin:wdth,wght@75..125,300..800&family=Anek+Gurmukhi:wght@400;600&family=Anek+Devanagari:wght@400;600&family=Mukta:wght@400;500;700&family=Spline+Sans+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,400..800&family=Public+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Anek+Gurmukhi:wght@500;700&family=Anek+Devanagari:wght@400;600&display=swap" rel="stylesheet">
+<link href="https://unpkg.com/maplibre-gl@5.6.0/dist/maplibre-gl.css" rel="stylesheet">
+<script src="https://unpkg.com/maplibre-gl@5.6.0/dist/maplibre-gl.js"></script>
 <style>
+/* Blue hour over the Malwa. The interface lives in the hour after sunset: deep blue-hour navy, the last
+   amber of the sky for action, ash-rose smoke, fires on a black-body heat ramp, the official count in cool
+   cyan rings. Dark by design: it is a night map. */
 :root {
-  --page: #E7E6EA;       /* cool ash */
-  --panel: #F4F3F6;
-  --ink: #1C1B22;
-  --muted: #615E6B;
-  --rule: #CFCDD6;
-  --night: #141A33;      /* map sky */
-  --night-ink: #C9C6DA;
-  --straw: #D6A93F;      /* daylight in the night strip */
-  --official: #2F6FB0;   /* the official count / status quo (validated vs ember, light surface) */
-  --c-ember: #C8461A;    /* Saanjh / fires the count missed, for charts on the light surface */
-  --ember: #EE5A24;      /* missed by them */
-  --smoke: #B9A7D6;
-  --alert: #B4231C;
-  --watch: #B9761A;
-  --focus: #3F5BD8;
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --page: #111018; --panel: #1A1922; --ink: #ECEAF2; --muted: #A29FB0; --rule: #2E2C39;
-    --alert: #FF6B5E; --watch: #E7A84A; --focus: #8EA2FF; --official: #4E8FD0; --c-ember: #EE5A24;
-  }
-}
-:root[data-theme="dark"] {
-  --page: #111018; --panel: #1A1922; --ink: #ECEAF2; --muted: #A29FB0; --rule: #2E2C39;
-  --alert: #FF6B5E; --watch: #E7A84A; --focus: #8EA2FF; --official: #4E8FD0; --c-ember: #EE5A24;
+  --night-0: #07131C; --night-1: #0C1D29; --night-2: #12293A; --night-3: #1A3A50;
+  --glass: rgba(12, 29, 41, .78); --glass-hi: rgba(20, 44, 61, .86);
+  --rule: rgba(150, 196, 222, .14); --rule-hi: rgba(150, 196, 222, .28);
+  --ink: #EAF1F4; --ink-2: #A9BCC8; --ink-3: #6F8897;
+  --dusk: #F4A259; --dusk-deep: #C9772E;
+  --smoke: #E9D3C1;
+  --official: #8FD6EA;
+  --c-saanjh: #E46A24; --c-official: #1FA2C9; --c-muted: #6F8897;   /* validated chart pair (dataviz validator) */
+  --alert: #FF6F61; --watch: #F6C453;
+  --r: 14px;
+  --shadow: 0 18px 50px rgba(0, 0, 0, .45), 0 2px 6px rgba(0, 0, 0, .3);
+  --ease: cubic-bezier(.2, .8, .2, 1);
+  --display: "Archivo", system-ui, sans-serif; --text: "Public Sans", system-ui, sans-serif; --mono: "IBM Plex Mono", ui-monospace, monospace;
 }
 * { box-sizing: border-box; }
-body { margin: 0; background: var(--page); color: var(--ink); font: 400 16px/1.5 Mukta, system-ui, sans-serif; }
-:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
-.wrap { max-width: 1320px; margin: 0 auto; padding: 20px 16px 48px; }
+html, body { height: 100%; margin: 0; }
+body { background: var(--night-0); color: var(--ink); font: 400 14.5px/1.5 var(--text); overflow: hidden; -webkit-font-smoothing: antialiased; }
+:focus-visible { outline: 2px solid var(--dusk); outline-offset: 2px; border-radius: 6px; }
+button { font: inherit; color: inherit; cursor: pointer; }
+[hidden] { display: none !important; }
+#map { position: fixed; inset: 0; }
+.maplibregl-ctrl-attrib { background: rgba(7, 19, 28, .6) !important; color: var(--ink-3) !important; font-size: 10px; }
+.maplibregl-ctrl-attrib a { color: var(--ink-2) !important; }
+.maplibregl-ctrl-bottom-right { bottom: 104px; }
 
-header { display: grid; gap: 10px; padding: 8px 0 22px; }
-.brand { display: flex; align-items: baseline; gap: 12px; font: 700 15px/1 "Anek Latin"; font-stretch: 112%; letter-spacing: .14em; text-transform: uppercase; }
-.brand .gur { font: 600 17px/1 "Anek Gurmukhi"; letter-spacing: 0; color: var(--muted); text-transform: none; }
-.brand .day { margin-left: auto; font: 400 13px/1 "Spline Sans Mono"; letter-spacing: 0; text-transform: none; color: var(--muted); }
-h1 { margin: 6px 0 0; max-width: 30ch; font: 760 clamp(28px, 3.9vw, 50px)/1.04 "Anek Latin"; font-stretch: 78%; letter-spacing: -.01em; }
-h1 em { font-style: normal; color: var(--ember); }
-.facts { display: flex; flex-wrap: wrap; gap: 6px 22px; font: 400 13px/1.4 "Spline Sans Mono"; color: var(--muted); }
-.facts b { color: var(--ink); font-weight: 500; }
+.glass { background: var(--glass); backdrop-filter: blur(18px) saturate(1.3); -webkit-backdrop-filter: blur(18px) saturate(1.3);
+  border: 1px solid var(--rule); border-radius: var(--r); box-shadow: var(--shadow); }
 
-main { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(320px, 1fr); gap: 20px; align-items: start; }
-@media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+/* top bar */
+.top { position: fixed; top: 14px; left: 14px; right: 14px; display: flex; gap: 10px; align-items: center; z-index: 5; pointer-events: none; }
+.top > * { pointer-events: auto; }
+.brand { display: flex; align-items: center; gap: 12px; padding: 8px 16px 8px 10px; height: 54px; }
+.mark { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; position: relative; overflow: hidden;
+  background: radial-gradient(120% 90% at 50% 120%, #F4A259 0%, #C9772E 30%, #3B2A4A 62%, #12293A 100%); }
+.mark span { font: 700 18px/1 "Anek Gurmukhi"; color: #FFF4E6; text-shadow: 0 1px 0 rgba(0,0,0,.3); }
+.brand h1 { margin: 0; font: 760 17px/1 var(--display); font-stretch: 118%; letter-spacing: .04em; }
+.brand p { margin: 3px 0 0; font: 400 11.5px/1.2 var(--mono); color: var(--ink-2); white-space: nowrap; }
+.brand { flex: none; }
+.daypick { display: flex; align-items: center; gap: 8px; height: 54px; padding: 0 12px; }
+.daypick label { font: 500 11px var(--mono); color: var(--ink-3); text-transform: uppercase; letter-spacing: .08em; }
+.daypick select { background: transparent; color: var(--ink); border: 0; font: 500 13.5px var(--text); padding: 6px 2px; max-width: 230px; }
+.daypick select option, .daypick select optgroup { background: var(--night-1); color: var(--ink); }
+.live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ink-3); flex: none; }
+.live-dot.on { background: #6BD39A; animation: ping 2s infinite; }
+@keyframes ping { 0% { box-shadow: 0 0 0 0 rgba(107,211,154,.55); } 70% { box-shadow: 0 0 0 9px rgba(107,211,154,0); } 100% { box-shadow: 0 0 0 0 rgba(107,211,154,0); } }
+.search { flex: 1; max-width: 360px; height: 54px; display: flex; align-items: center; gap: 10px; padding: 0 14px; margin-left: auto; }
+.search svg { flex: none; opacity: .7; }
+.search input { flex: 1; min-width: 0; background: transparent; border: 0; color: var(--ink); font: 500 14px var(--text); }
+.search input::placeholder { color: var(--ink-3); }
+.search input:focus { outline: none; }
+.btn-ev { height: 54px; padding: 0 18px; display: flex; align-items: center; gap: 9px; white-space: nowrap; flex: none;
+  background: linear-gradient(180deg, rgba(244,162,89,.18), rgba(244,162,89,.06)), var(--glass); font: 600 13.5px var(--text); }
+.btn-ev:hover { border-color: rgba(244,162,89,.5); }
 
-.mapcard { background: var(--night); border-radius: 14px; overflow: hidden; color: var(--night-ink); }
-.mapbox { position: relative; }
-canvas#map { display: block; width: 100%; height: auto; touch-action: none; }
-.legend { position: absolute; left: 14px; bottom: 12px; display: flex; flex-wrap: wrap; gap: 4px 14px; font: 400 12px/1.3 "Spline Sans Mono"; }
-.legend i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; }
-.clock { position: absolute; right: 14px; top: 10px; text-align: right; }
-.clock .t { font: 700 34px/1 "Anek Latin"; font-stretch: 80%; color: #fff; }
-.clock .d { font: 400 12px/1.4 "Spline Sans Mono"; }
-.tip { position: absolute; pointer-events: none; background: #0B0E1E; color: #fff; padding: 6px 9px; border-radius: 6px; font: 400 12px/1.35 "Spline Sans Mono"; white-space: nowrap; transform: translate(-50%, calc(-100% - 10px)); display: none; }
+/* left panel */
+.panel { position: fixed; left: 14px; top: 80px; bottom: 112px; width: 404px; z-index: 4; display: flex; flex-direction: column; overflow: hidden; }
+.hero { padding: 18px 20px 14px; border-bottom: 1px solid var(--rule); position: relative; }
+.hero::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 1px; background: linear-gradient(90deg, transparent, rgba(244,162,89,.55), transparent); }
+.eyebrow { font: 500 11px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); display: flex; gap: 8px; align-items: center; }
+.eyebrow .pill { padding: 2px 7px; border-radius: 99px; border: 1px solid var(--rule-hi); color: var(--ink-2); letter-spacing: .04em; }
+.big { display: flex; align-items: center; gap: 14px; margin-top: 10px; }
+.big b { font: 780 58px/0.9 var(--display); font-stretch: 112%; letter-spacing: -.02em; flex: none;
+  background: linear-gradient(180deg, #FFD08A 0%, #F28A3B 55%, #D9492E 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.big span { font: 500 13.5px/1.35 var(--text); color: var(--ink-2); }
+.big span em { color: var(--ink); font-style: normal; font-weight: 600; }
+.kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; margin-top: 14px; background: var(--rule); border-radius: 10px; overflow: hidden; }
+.kpi { background: var(--night-1); padding: 9px 10px; }
+.kpi b { display: block; font: 700 18px/1.1 var(--display); font-stretch: 110%; font-variant-numeric: tabular-nums; }
+.kpi span { font: 400 11px/1.25 var(--text); color: var(--ink-3); }
 
-/* The night strip: the timeline people scrub, painted with the sky it covers. */
-.strip { padding: 12px 14px 14px; border-top: 1px solid #262C4D; }
-.strip-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; font: 400 12px/1.3 "Spline Sans Mono"; }
-.strip-head button { white-space: nowrap; font: 500 12px/1 "Spline Sans Mono"; color: #fff; background: #262C4D; border: 0; border-radius: 999px; padding: 7px 12px; cursor: pointer; }
-.strip-head span { margin-left: auto; opacity: .8; }
-svg#strip { display: block; width: 100%; height: 104px; cursor: ew-resize; }
-svg#strip text { font: 400 10.5px "Spline Sans Mono"; fill: #C9C6DA; }
+.tabs { display: grid; grid-template-columns: repeat(3, 1fr); position: relative; margin: 12px 14px 0; padding: 4px; background: rgba(7,19,28,.6); border-radius: 11px; border: 1px solid var(--rule); }
+.tabs button { position: relative; z-index: 1; border: 0; background: transparent; padding: 9px 6px; font: 600 12.5px/1.2 var(--text); color: var(--ink-2); border-radius: 8px; transition: color .25s var(--ease); }
+.tabs button[aria-selected="true"] { color: var(--night-0); }
+.tabs .slider { position: absolute; z-index: 0; top: 4px; bottom: 4px; left: 4px; width: calc((100% - 8px) / 3); border-radius: 8px;
+  background: linear-gradient(180deg, #F7B375, #F09A4E); box-shadow: 0 4px 14px rgba(244,162,89,.35); transition: transform .38s var(--ease); }
+.pane { flex: 1; overflow: auto; padding: 14px 16px 18px; scrollbar-width: thin; scrollbar-color: var(--night-3) transparent; }
+.lede { margin: 0 0 12px; color: var(--ink-2); font-size: 13.5px; }
+.lede b { color: var(--ink); font-weight: 600; }
 
-aside { background: var(--panel); border: 1px solid var(--rule); border-radius: 14px; overflow: hidden; }
-.tabs { display: grid; grid-template-columns: 1fr 1fr 1fr; border-bottom: 1px solid var(--rule); }
-.tabs button { font: 600 15px/1.2 "Anek Latin"; font-stretch: 95%; padding: 14px 10px; border: 0; background: transparent; color: var(--muted); cursor: pointer; border-bottom: 3px solid transparent; }
-.tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--ink); }
-.pane { padding: 16px; }
-.pane[hidden] { display: none; }
-.lede { margin: 0 0 12px; color: var(--muted); font-size: 15px; }
+.rows { list-style: none; margin: 0; padding: 0; }
+.rows li { animation: rise .45s var(--ease) both; animation-delay: calc(var(--i, 0) * 28ms); }
+@keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.row { width: calc(100% + 8px); display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; align-items: center; padding: 10px; margin: 0 -4px;
+  border: 0; background: transparent; text-align: left; border-radius: 10px; transition: background .2s; }
+.row:hover { background: rgba(150,196,222,.07); }
+.row[aria-pressed="true"] { background: rgba(244,162,89,.12); box-shadow: inset 0 0 0 1px rgba(244,162,89,.35); }
+.row .t { font: 600 15px/1.2 var(--text); }
+.row .s { grid-column: 1; font: 400 12px var(--mono); color: var(--ink-3); }
+.lvl { grid-row: span 2; display: inline-flex; align-items: center; gap: 6px; font: 600 11px var(--mono); padding: 4px 9px; border-radius: 99px; letter-spacing: .03em; }
+.lvl::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.lvl.alert { color: var(--alert); background: rgba(255,111,97,.12); }
+.lvl.watch { color: var(--watch); background: rgba(246,196,83,.12); }
+.lvl.low { color: var(--ink-3); background: rgba(111,136,151,.12); }
+.more-btn { border: 0; background: none; color: var(--dusk); font: 500 12.5px var(--mono); padding: 8px 4px; }
 
-.towns { list-style: none; margin: 0; padding: 0; }
-.towns li button { width: 100%; display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: baseline; padding: 9px 4px; border: 0; border-bottom: 1px solid var(--rule); background: none; color: inherit; text-align: left; cursor: pointer; font: inherit; }
-.towns li button.link { display: block; border: 0; color: var(--focus); }
-.towns li button[aria-pressed="true"] { background: color-mix(in srgb, var(--smoke) 22%, transparent); }
-.towns .name { font: 600 16px/1.2 "Anek Latin"; }
-.towns .when { font: 400 13px "Spline Sans Mono"; color: var(--muted); }
-.lvl { font: 500 11px/1 "Spline Sans Mono"; padding: 4px 7px; border-radius: 999px; border: 1px solid currentColor; }
-.lvl.alert { color: var(--alert); } .lvl.watch { color: var(--watch); } .lvl.low { color: var(--muted); }
-.notice { margin: 14px 0 4px; padding: 14px; border-radius: 10px; background: var(--page); border-left: 4px solid var(--alert); }
-.notice h3 { margin: 0 0 6px; font: 700 18px/1.2 "Anek Latin"; }
-.notice p { margin: 0; }
-.notice .langs { display: flex; gap: 6px; margin: 10px 0 8px; }
-.notice .langs button { font: 500 12px/1 "Spline Sans Mono"; padding: 6px 10px; border-radius: 999px; border: 1px solid var(--rule); background: var(--panel); color: var(--ink); cursor: pointer; }
-.notice .langs button[aria-pressed="true"] { background: var(--ink); color: var(--panel); }
-.notice .msg[lang="pa"] { font-family: "Anek Gurmukhi", Mukta, sans-serif; }
-.notice .msg[lang="hi"] { font-family: "Anek Devanagari", Mukta, sans-serif; }
-.more { margin-top: 8px; font: 400 13px "Spline Sans Mono"; color: var(--muted); }
+.card { margin-top: 12px; padding: 14px; border-radius: 12px; background: var(--glass-hi); border: 1px solid var(--rule); animation: rise .4s var(--ease); }
+.card h3 { margin: 0 0 6px; font: 700 16px/1.25 var(--display); font-stretch: 108%; }
+.card p { margin: 0 0 8px; color: var(--ink-2); }
+.card p b { color: var(--ink); }
+.card .msg { color: var(--ink); font-size: 14.5px; }
+.card .msg[lang="pa"] { font-family: "Anek Gurmukhi", var(--text); font-size: 15.5px; }
+.card .msg[lang="hi"] { font-family: "Anek Devanagari", var(--text); font-size: 15.5px; }
+.seg { display: inline-flex; gap: 2px; padding: 3px; background: rgba(7,19,28,.6); border-radius: 9px; margin: 2px 0 10px; }
+.seg button { border: 0; background: transparent; padding: 5px 10px; border-radius: 7px; font: 500 12px var(--text); color: var(--ink-2); }
+.seg button[aria-pressed="true"] { background: var(--night-3); color: var(--ink); }
+.fine { font: 400 11.5px/1.45 var(--mono); color: var(--ink-3); }
+.obar { display: flex; height: 8px; border-radius: 4px; overflow: hidden; gap: 2px; margin: 8px 0 6px; }
+.obar span { display: block; height: 100%; border-radius: 2px; transform-origin: left; animation: grow .7s var(--ease) both; }
+@keyframes grow { from { transform: scaleX(0); } }
+.okey { display: flex; flex-wrap: wrap; gap: 4px 12px; font: 400 11.5px var(--mono); color: var(--ink-2); }
+.okey i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 5px; }
+.act { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.btn { border: 1px solid var(--rule-hi); background: rgba(150,196,222,.06); padding: 8px 12px; border-radius: 9px; font: 600 12.5px var(--text); color: var(--ink); transition: border-color .2s, background .2s; }
+.btn:hover { border-color: rgba(244,162,89,.55); background: rgba(244,162,89,.1); }
+.btn.primary { background: linear-gradient(180deg, #F7B375, #F09A4E); color: var(--night-0); border-color: transparent; }
 
-table { width: 100%; border-collapse: collapse; font-size: 14px; }
-th { text-align: left; font: 500 11px/1.2 "Spline Sans Mono"; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; padding: 6px 4px; border-bottom: 1px solid var(--rule); }
-td { padding: 8px 4px; border-bottom: 1px solid var(--rule); vertical-align: baseline; }
-td.num { font-family: "Spline Sans Mono"; font-size: 13px; text-align: right; }
-tbody tr { cursor: pointer; }
-tbody tr:hover, tbody tr[aria-selected="true"] { background: color-mix(in srgb, var(--smoke) 20%, transparent); }
-.rec { font: 500 11px/1 "Spline Sans Mono"; padding: 3px 6px; border-radius: 4px; }
-.rec.missed { background: var(--ember); color: #fff; } .rec.counted { background: var(--official); color: #fff; }
-.why { margin: 12px 0 0; padding: 12px; background: var(--page); border-radius: 10px; font-size: 15px; }
-.why b { font-weight: 700; }
-button.link { background: none; border: 0; color: var(--focus); font: 500 13px "Spline Sans Mono"; cursor: pointer; padding: 10px 0 0; }
+.firerow { grid-template-columns: 22px 1fr auto; }
+.firerow .s { grid-column: 2; }
+.rank { font: 700 13px var(--mono); color: var(--ink-3); }
+.heat { width: 9px; height: 9px; border-radius: 50%; display: inline-block; margin-right: 8px; vertical-align: 1px; }
+.share { font: 600 13px var(--mono); color: var(--ink); text-align: right; }
+.tag { font: 600 10px var(--mono); padding: 2px 6px; border-radius: 5px; margin-left: 7px; letter-spacing: .05em; vertical-align: 1px; }
+.tag.missed { color: #FFB38A; background: rgba(228,106,36,.16); }
+.tag.counted { color: var(--official); background: rgba(31,162,201,.16); }
+.spark { display: block; width: 100%; height: auto; margin: 6px 0 2px; }
+.spark text { font: 400 9.5px var(--mono); fill: var(--ink-3); }
+.ask { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--rule); }
+.ask label { display: block; font: 600 12.5px var(--text); color: var(--ink-2); margin-bottom: 6px; }
+.ask form { display: flex; gap: 6px; }
+.ask input { flex: 1; min-width: 0; background: rgba(7,19,28,.6); border: 1px solid var(--rule); border-radius: 9px; padding: 9px 11px; color: var(--ink); font: 400 13.5px var(--text); }
+.answer { margin: 10px 0 0; font-size: 13.5px; color: var(--ink); white-space: pre-wrap; }
+.answer.loading { color: var(--ink-3); }
+.answer.loading::after { content: "…"; }
 
-.ask { margin-top: 16px; }
-.ask label { display: block; font: 600 14px "Anek Latin"; margin-bottom: 6px; }
-.ask div { display: flex; gap: 6px; }
-.ask input { flex: 1; min-width: 0; font: inherit; font-size: 15px; padding: 9px 10px; border-radius: 8px; border: 1px solid var(--rule); background: var(--page); color: var(--ink); }
-.ask button, .why button { font: 500 13px "Spline Sans Mono"; padding: 8px 12px; border-radius: 8px; border: 0; background: var(--ink); color: var(--panel); cursor: pointer; }
-.why button { margin-top: 10px; }
-#answer { margin: 10px 0 0; font-size: 15px; white-space: pre-wrap; }
-.slider label { display: block; font: 600 14px "Anek Latin"; margin-bottom: 4px; }
-.slider input { width: 100%; accent-color: var(--ember); }
-.planstat { font-size: 15px; margin: 10px 0; }
-.planstat b { font-weight: 700; }
-ol.teams { margin: 0; padding-left: 22px; font-size: 14px; max-height: 320px; overflow: auto; }
-ol.teams li { padding: 3px 0; border-bottom: 1px solid var(--rule); }
-ol.teams li span { font-family: "Spline Sans Mono"; font-size: 12px; color: var(--muted); float: right; }
-.origin { margin-top: 12px; }
-.origin h4 { margin: 0 0 6px; font: 600 14px "Anek Latin"; }
-.obar { display: flex; height: 14px; border-radius: 7px; overflow: hidden; background: var(--rule); }
-.obar span { display: block; height: 100%; }
-.okey { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 6px 0; font: 400 12px "Spline Sans Mono"; color: var(--muted); }
-.okey i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
-.origin ol { margin: 4px 0 0; padding-left: 20px; font-size: 14px; }
-.evidence { margin-top: 32px; }
-.evidence h2 { margin: 0 0 4px; font: 760 30px/1.1 "Anek Latin"; font-stretch: 85%; }
-.ev-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; margin-top: 14px; }
-.ev { background: var(--panel); border: 1px solid var(--rule); border-radius: 14px; padding: 16px; }
-.ev h3 { margin: 0 0 2px; font: 700 18px/1.2 "Anek Latin"; }
-.ev .cap { margin: 8px 0 0; font-size: 13px; color: var(--muted); }
-.ev svg { display: block; width: 100%; height: auto; margin-top: 8px; overflow: visible; }
-.ev svg text { font: 400 11px "Spline Sans Mono"; fill: var(--muted); }
+.teamctl { display: flex; align-items: center; gap: 12px; margin: 4px 0 12px; }
+.teamctl input[type=range] { flex: 1; accent-color: var(--dusk); }
+.teamctl output { font: 700 24px var(--display); font-stretch: 110%; min-width: 34px; text-align: right; font-variant-numeric: tabular-nums; }
+.meter { height: 10px; border-radius: 5px; background: rgba(150,196,222,.1); overflow: hidden; margin: 8px 0 4px; }
+.meter i { display: block; height: 100%; border-radius: 5px; background: linear-gradient(90deg, #D9492E, #F28A3B, #FFD08A); transition: width .5s var(--ease); }
+.teams { margin: 10px 0 0; padding: 0; list-style: none; counter-reset: t; }
+.teams li { display: grid; grid-template-columns: 24px 1fr auto; gap: 8px; padding: 7px 0; border-bottom: 1px solid var(--rule); font-size: 13.5px; align-items: center; }
+.teams li::before { counter-increment: t; content: counter(t); font: 700 11.5px/20px var(--mono); text-align: center; width: 20px; height: 20px; border-radius: 6px; background: var(--night-3); color: var(--official); }
+.teams li span { font: 500 12px var(--mono); color: var(--ink-3); }
+
+.ctrls { position: fixed; right: 14px; top: 80px; z-index: 4; display: flex; flex-direction: column; gap: 10px; }
+.ctrl { display: flex; flex-direction: column; overflow: hidden; }
+.ctrl button { width: 42px; height: 42px; border: 0; background: transparent; display: grid; place-items: center; transition: background .2s; }
+.ctrl button + button { border-top: 1px solid var(--rule); }
+.ctrl button:hover { background: rgba(150,196,222,.08); }
+.ctrl button[aria-pressed="true"] { color: var(--dusk); }
+.ctrl svg { width: 18px; height: 18px; }
+.ctrl .txt { font: 700 12px var(--mono); }
+.layers { position: fixed; right: 66px; top: 80px; z-index: 4; padding: 10px 12px; display: none; min-width: 220px; }
+.layers.open { display: block; animation: rise .25s var(--ease); }
+.layers label { display: flex; align-items: center; gap: 9px; padding: 6px 2px; font-size: 13px; cursor: pointer; }
+.layers input { accent-color: var(--dusk); }
+.legend { position: fixed; right: 14px; bottom: 112px; z-index: 3; padding: 10px 12px; font: 400 11.5px var(--mono); color: var(--ink-2); display: grid; gap: 6px; }
+.legend .lr { display: flex; align-items: center; gap: 8px; }
+.legend .ramp { width: 64px; height: 8px; border-radius: 4px; background: linear-gradient(90deg, #8E2C1F, #D9492E, #F28A3B, #FFD08A); flex: none; }
+.legend .ring { width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--official); flex: none; }
+.legend .haze { width: 22px; height: 10px; border-radius: 6px; background: linear-gradient(90deg, rgba(233,211,193,.15), rgba(214,140,110,.85)); flex: none; }
+.legend .col { width: 10px; height: 12px; background: linear-gradient(0deg, #D9492E, #FFD08A); border-radius: 2px; flex: none; }
+.legend .dot { width: 6px; height: 6px; border-radius: 50%; background: #F4F6F7; flex: none; margin: 0 2px; }
+
+.timeline { position: fixed; left: 432px; right: 14px; bottom: 14px; height: 84px; z-index: 4; display: flex; align-items: stretch; overflow: hidden; }
+.play { width: 84px; border: 0; border-right: 1px solid var(--rule); background: transparent; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; }
+.play svg { width: 26px; height: 26px; color: var(--dusk); }
+.play span { font: 500 10.5px var(--mono); color: var(--ink-3); letter-spacing: .06em; text-transform: uppercase; }
+.clock { width: 132px; display: flex; flex-direction: column; justify-content: center; padding: 0 14px; border-right: 1px solid var(--rule); }
+.clock b { font: 760 28px/1 var(--display); font-stretch: 105%; font-variant-numeric: tabular-nums; }
+.clock span { font: 400 11px var(--mono); color: var(--ink-3); margin-top: 4px; }
+.horizon { flex: 1; position: relative; cursor: ew-resize; touch-action: none; }
+.horizon svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.horizon text { font: 400 10px var(--mono); fill: var(--ink-3); }
+
+.maplibregl-popup-content { background: var(--glass-hi) !important; backdrop-filter: blur(14px); color: var(--ink); border: 1px solid var(--rule-hi); border-radius: 12px !important; padding: 10px 12px !important; box-shadow: var(--shadow) !important; font: 400 13px var(--text); }
+.maplibregl-popup-tip { display: none; }
+.pop b { font: 700 14px var(--display); }
+
+.sheet { position: fixed; inset: 0; z-index: 20; background: rgba(4, 11, 17, .72); backdrop-filter: blur(6px); display: none; }
+.sheet.open { display: block; animation: fade .3s var(--ease); }
+@keyframes fade { from { opacity: 0; } }
+.sheet-inner { position: absolute; inset: 24px; overflow: auto; border-radius: 18px; background: linear-gradient(180deg, var(--night-1), var(--night-0)); border: 1px solid var(--rule); padding: 34px clamp(18px, 4vw, 54px) 54px; animation: up .45s var(--ease); }
+@keyframes up { from { transform: translateY(24px); opacity: 0; } }
+.sheet h2 { margin: 6px 0 0; font: 780 clamp(30px, 4vw, 48px)/1.02 var(--display); font-stretch: 112%; letter-spacing: -.01em; max-width: 18ch; }
+.sheet .lede { max-width: 70ch; font-size: 15px; margin-top: 10px; }
+.sheet-close { position: absolute; top: 18px; right: 18px; width: 40px; height: 40px; border-radius: 12px; border: 1px solid var(--rule); background: var(--night-2); font-size: 16px; }
+.ev-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 16px; margin-top: 26px; }
+.ev { background: rgba(18, 41, 58, .55); border: 1px solid var(--rule); border-radius: 16px; padding: 18px; animation: rise .5s var(--ease) both; animation-delay: calc(var(--i, 0) * 70ms); }
+.ev h3 { margin: 0 0 4px; font: 700 18px/1.25 var(--display); font-stretch: 106%; }
+.ev .num { font: 780 46px/1 var(--display); font-stretch: 112%; color: var(--c-saanjh); }
+.ev svg { display: block; width: 100%; height: auto; margin-top: 10px; overflow: visible; }
+.ev svg text { font: 400 10.5px var(--mono); fill: var(--ink-3); }
 .ev svg .val { fill: var(--ink); font-weight: 500; }
-.ev svg .mark:hover { opacity: .75; }
-.ev .key { display: flex; gap: 14px; flex-wrap: wrap; font: 400 12px "Spline Sans Mono"; color: var(--muted); margin-top: 6px; }
+.ev .cap { margin: 10px 0 0; font-size: 12.5px; color: var(--ink-3); }
+.ev .key { display: flex; gap: 14px; flex-wrap: wrap; font: 400 11.5px var(--mono); color: var(--ink-2); margin-top: 8px; }
 .ev .key i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
-.ev details { margin-top: 8px; font-size: 13px; }
-.ev details summary { cursor: pointer; color: var(--muted); font: 400 12px "Spline Sans Mono"; }
-.ev details table td, .ev details table th { padding: 3px 6px; font-size: 12px; }
-.ev.neg { border-left: 4px solid var(--muted); }
-.ev .big { font: 760 44px/1 "Anek Latin"; font-stretch: 80%; color: var(--c-ember); }
-.spark { display: block; width: 100%; max-width: 360px; height: auto; margin-top: 10px; }
-.spark text { font: 400 10px "Spline Sans Mono"; fill: var(--muted); }
-.sparkcap { font: 400 11px "Spline Sans Mono"; color: var(--muted); }
-footer { margin-top: 28px; display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 18px; font-size: 14px; color: var(--muted); }
-footer h4 { margin: 0 0 4px; font: 600 14px "Anek Latin"; color: var(--ink); }
-footer p { margin: 0; }
-footer a { color: inherit; }
-@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+.ev details { margin-top: 8px; } .ev summary { cursor: pointer; font: 400 11.5px var(--mono); color: var(--ink-3); }
+.ev table { border-collapse: collapse; width: 100%; margin-top: 6px; } .ev td, .ev th { text-align: left; padding: 3px 6px; font: 400 11.5px var(--mono); border-bottom: 1px solid var(--rule); }
+.ev.neg { border-left: 3px solid var(--ink-3); }
+.ev .mark:hover { opacity: .75; }
+
+.toast { position: fixed; left: 50%; top: 84px; transform: translateX(-50%); z-index: 30; padding: 10px 14px; font-size: 13px; max-width: min(560px, 90vw); display: none; }
+.toast.show { display: block; animation: rise .3s var(--ease); }
+.loader { position: fixed; inset: 0; z-index: 40; display: grid; place-items: center; background: radial-gradient(80% 60% at 50% 100%, #3B2A4A 0%, #12293A 45%, var(--night-0) 100%); transition: opacity .8s var(--ease); }
+.loader.done { opacity: 0; pointer-events: none; }
+.loader .sun { width: 70px; height: 70px; margin: 0 auto; border-radius: 50%; background: radial-gradient(circle at 50% 70%, #FFD08A, #F28A3B 45%, #8E2C1F 80%); box-shadow: 0 0 70px rgba(244,162,89,.5); animation: set 2.4s var(--ease) infinite alternate; }
+@keyframes set { from { transform: translateY(-6px); } to { transform: translateY(14px); opacity: .65; } }
+.loader p { margin: 22px 0 0; font: 500 12px var(--mono); color: var(--ink-2); letter-spacing: .14em; text-transform: uppercase; text-align: center; }
+.loader h2 { margin: 18px 0 0; font: 700 24px/1 "Anek Gurmukhi"; text-align: center; color: #FFE6C7; }
+
+@media (max-width: 860px) {
+  body:not(.force-desktop) .top { flex-wrap: wrap; top: 10px; left: 10px; right: 10px; }
+  body:not(.force-desktop) .brand p { display: none; }
+  body:not(.force-desktop) .search { display: none; }
+  body:not(.force-desktop) .brand { height: 48px; } body:not(.force-desktop) .daypick { height: 48px; flex: 1; } body:not(.force-desktop) .btn-ev { height: 48px; }
+  body:not(.force-desktop) .btn-ev span { display: none; } body:not(.force-desktop) .btn-ev { padding: 0 14px; }
+  body:not(.force-desktop) .daypick label { display: none; } body:not(.force-desktop) .daypick select { max-width: 120px; }
+  body:not(.force-desktop) .panel { top: auto; bottom: 106px; left: 10px; right: 10px; width: auto; max-height: 42vh; }
+  body:not(.force-desktop) .hero { padding: 12px 14px 10px; } body:not(.force-desktop) .big b { font-size: 40px; } body:not(.force-desktop) .kpis { display: none; }
+  body:not(.force-desktop) .timeline { left: 10px; right: 10px; bottom: 10px; height: 86px; }
+  body:not(.force-desktop) .clock { width: 92px; } body:not(.force-desktop) .clock b { font-size: 22px; } body:not(.force-desktop) .play { width: 58px; }
+  body:not(.force-desktop) .ctrls { top: 70px; right: 10px; } body:not(.force-desktop) .layers { top: 70px; right: 60px; } body:not(.force-desktop) .legend { display: none; }
+  body:not(.force-desktop) .sheet-inner { inset: 8px; padding: 26px 16px 40px; }
+  body:not(.force-desktop) .ev-grid { grid-template-columns: 1fr; }
+}
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <header>
-    <div class="brand">Saanjh <span class="gur">ਸਾਂਝ · dusk</span><span class="day" id="day"></span></div>
-    <h1 id="thesis">Loading tonight's fires…</h1>
-    <div class="facts" id="facts"></div>
-  </header>
+<div id="map" aria-label="3D map of Punjab and Haryana with tonight's fires and smoke"></div>
+<canvas id="smoke-canvas" width="600" height="480" hidden></canvas>
 
-  <main>
-    <section class="mapcard" aria-label="Map of fires and smoke">
-      <div class="mapbox">
-        <canvas id="map" width="900" height="660" aria-label="Map of Punjab and Haryana showing fires and drifting smoke"></canvas>
-        <div class="clock"><div class="t" id="clock">--:--</div><div class="d" id="clockd"></div></div>
-        <div class="legend" id="legend-plan" hidden>
-          <span><i style="background:var(--ember)"></i>tonight's expected smoke harm</span>
-          <span><i style="background:#fff"></i>fires that actually burned (replays)</span>
-          <span><i style="background:var(--smoke)"></i>team patrol block</span>
-        </div>
-        <div class="legend" id="legend-main">
-          <span><i style="background:var(--ember)"></i>missed by the official count</span>
-          <span><i style="background:#4E8FD0"></i>counted</span>
-          <span><i style="background:var(--smoke)"></i>farm smoke at ground level</span>
-        </div>
-        <div class="tip" id="tip"></div>
-      </div>
-      <div class="strip">
-        <div class="strip-head">
-          <button id="play" type="button">Play the night</button>
-          <span>Drag along the strip to see the smoke move. Ticks show when each fire was first seen.</span>
-        </div>
-        <svg id="strip" role="slider" tabindex="0" aria-label="Time of night" aria-valuemin="0"></svg>
-      </div>
-    </section>
+<div class="loader" id="loader" aria-hidden="true"><div><div class="sun"></div><h2>ਸਾਂਝ</h2><p>Reading tonight's sky</p></div></div>
 
-    <aside>
-      <div class="tabs" role="tablist">
-        <button role="tab" id="t-res" aria-selected="true" aria-controls="p-res">When smoke reaches you</button>
-        <button role="tab" id="t-off" aria-selected="false" aria-controls="p-off">Fires that matter tonight</button>
-        <button role="tab" id="t-plan" aria-selected="false" aria-controls="p-plan">Send teams before dusk</button>
-      </div>
-      <div class="pane" id="p-res" role="tabpanel" aria-labelledby="t-res">
-        <p class="lede">Choose your town to see when farm-fire smoke is expected tonight and what schools can do.</p>
-        <ul class="towns" id="towns"></ul>
-        <div id="notice"></div>
-      </div>
-      <div class="pane" id="p-plan" role="tabpanel" aria-labelledby="t-plan" hidden>
-        <p class="lede">Made at 11:30 IST, before the burning starts. Each block is a ~33 km patrol area placed where tonight's fires are likely <em>and</em> their smoke would reach the most people.</p>
-        <div class="slider"><label for="teams">Field teams available: <b id="teamsn">20</b></label>
-          <input type="range" id="teams" min="1" max="30" value="20"></div>
-        <p class="planstat" id="planstat"></p>
-        <ol class="teams" id="teamlist"></ol>
-        <p class="more">How well this works: on the held-out 2025 season, 20 teams placed this way covered 75% of the next evening's smoke harm, against 31% when teams chase the previous day's officially counted fires.</p>
-      </div>
-      <div class="pane" id="p-off" role="tabpanel" aria-labelledby="t-off" hidden>
-        <p class="lede">Fires Saanjh saw this afternoon and evening, ranked by how much smoke each puts into people's air over the next day, not by size. Send field teams and residue machines to the top of this list.</p>
-        <table>
-          <thead><tr><th>#</th><th>Near</th><th>First seen</th><th class="num">Share of exposure</th><th>Record</th></tr></thead>
-          <tbody id="fires"></tbody>
-        </table>
-        <button class="link" id="morefires" type="button">Show all 50</button>
-        <div id="why"></div>
-        <form id="askform" class="ask">
-          <label for="askq">Ask about tonight's fires</label>
-          <div><input id="askq" name="q" maxlength="300" placeholder="Which fires should Patiala's team visit first?" autocomplete="off">
-          <button type="submit">Ask</button></div>
-          <p id="answer" aria-live="polite"></p>
-        </form>
-      </div>
-    </aside>
-  </main>
+<header class="top">
+  <div class="brand glass">
+    <div class="mark" aria-hidden="true"><span>ਸ</span></div>
+    <div><h1>SAANJH</h1><p>evening farm-fire watch · Punjab &amp; Haryana</p></div>
+  </div>
+  <div class="daypick glass">
+    <i class="live-dot" id="livedot" aria-hidden="true"></i>
+    <label for="day">Night</label>
+    <select id="day" aria-label="Choose the night"></select>
+  </div>
+  <div class="search glass">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+    <input id="q" list="townlist" placeholder="Find a town — Ludhiana, Delhi, Sirsa…" autocomplete="off" aria-label="Find a town">
+    <datalist id="townlist"></datalist>
+  </div>
+  <button class="btn-ev glass" id="open-ev" type="button" aria-haspopup="dialog">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/></svg>
+    <span>How we know it works</span>
+  </button>
+</header>
 
-  <section class="evidence" aria-labelledby="ev-h">
-    <h2 id="ev-h">How we know it works</h2>
-    <p class="lede">Measured on two full seasons of GK-2A images replayed on AWS. Methods were tuned on 2024 and tested on 2025, which the methods never saw.</p>
-    <div class="ev-grid" id="ev-grid"></div>
+<aside class="panel glass" aria-label="Tonight">
+  <section class="hero">
+    <div class="eyebrow"><span id="nightlabel">Tonight</span><span class="pill" id="modepill">live</span></div>
+    <div class="big"><b id="bigshare">–</b><span>of the fire energy seen tonight came <em>after</em> the satellites behind India's official count had passed</span></div>
+    <div class="kpis">
+      <div class="kpi"><b id="k-fires">–</b><span>fires GK-2A saw</span></div>
+      <div class="kpi"><b id="k-counted">–</b><span>burning at the 13:30 pass</span></div>
+      <div class="kpi"><b id="k-pm">–</b><span>PM2.5 released</span></div>
+    </div>
   </section>
+  <div class="tabs" role="tablist" aria-label="Views">
+    <i class="slider" id="tabslider" aria-hidden="true"></i>
+    <button role="tab" id="t-towns" aria-selected="true" aria-controls="p-towns">Smoke tonight</button>
+    <button role="tab" id="t-fires" aria-selected="false" aria-controls="p-fires">Fires that matter</button>
+    <button role="tab" id="t-teams" aria-selected="false" aria-controls="p-teams">Send teams</button>
+  </div>
+  <div class="pane" id="p-towns" role="tabpanel" aria-labelledby="t-towns">
+    <p class="lede">Towns where farm-fire smoke is expected tonight. Pick one to see when it arrives, how sure we are, and <b>which fires it comes from</b>.</p>
+    <ul class="rows" id="towns"></ul>
+    <div id="towncard"></div>
+  </div>
+  <div class="pane" id="p-fires" role="tabpanel" aria-labelledby="t-fires" hidden>
+    <p class="lede">Fires GK-2A saw this afternoon and evening, ranked by how much smoke each puts into people's air over the next day. Pick one to fly there.</p>
+    <ul class="rows" id="fires"></ul>
+    <button class="more-btn" id="morefires" type="button">Show all 50</button>
+    <div id="firecard"></div>
+    <div class="ask">
+      <label for="askq">Ask Saanjh about tonight</label>
+      <form id="askform"><input id="askq" maxlength="300" placeholder="Which fires should Patiala's team visit first?" autocomplete="off"><button class="btn primary" type="submit">Ask</button></form>
+      <p class="answer" id="answer" aria-live="polite"></p>
+    </div>
+  </div>
+  <div class="pane" id="p-teams" role="tabpanel" aria-labelledby="t-teams" hidden>
+    <p class="lede">Made at <b>11:30 IST</b>, before the burning starts. Columns rise where tonight's fires are likely <em>and</em> their smoke would reach the most people; each cyan block is a ~33 km patrol area.</p>
+    <div class="teamctl"><label for="teams" class="fine">Field teams</label><input type="range" id="teams" min="1" max="30" value="20"><output id="teamsn" for="teams">20</output></div>
+    <div id="planstat" class="fine"></div>
+    <div class="meter" aria-hidden="true"><i id="planmeter" style="width:0"></i></div>
+    <ol class="teams" id="teamlist"></ol>
+    <p class="fine" style="margin-top:12px">On the 2025 season the model never saw, 20 teams placed this way covered <b style="color:var(--ink)">75%</b> of the next evening's smoke harm, against 31% when teams chase the previous day's counted fires.</p>
+  </div>
+</aside>
 
-  <footer>
-    <div><h4>How this works</h4><p>Every 10 minutes the Korean GK-2A satellite images Punjab and Haryana. Saanjh finds fires in each image, follows their smoke with forecast winds and the height of the night-time air layer, and adds it up over where people live.</p></div>
-    <div><h4>What it doesn't do</h4><p>It works on a 2–4 km grid and never names farmers or plots. Small fires under about 10 MW are often too faint to see. Smoke levels show the farm-fire share only, not total pollution.</p></div>
-    <div><h4>Data</h4><p>GK-2A (KMA, via NOAA Open Data on AWS) · VIIRS active fires (NASA FIRMS) · ERA5 and forecasts (Open-Meteo) · WorldPop 2020 · geoBoundaries. Built on AWS Lambda, Step Functions, SQS, SNS, S3.</p></div>
-  </footer>
+<div class="ctrls">
+  <div class="ctrl glass">
+    <button type="button" id="zin" aria-label="Zoom in"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg></button>
+    <button type="button" id="zout" aria-label="Zoom out"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14"/></svg></button>
+  </div>
+  <div class="ctrl glass">
+    <button type="button" id="b3d" aria-pressed="true" aria-label="Switch between 3D and 2D"><span class="txt" id="b3dt">3D</span></button>
+    <button type="button" id="bnorth" aria-label="Reset the view"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l4 9-4-2-4 2z" fill="currentColor"/><path d="M12 21v-6"/></svg></button>
+    <button type="button" id="blayers" aria-label="Map layers" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 3 9 5-9 5-9-5z"/><path d="m3 13 9 5 9-5"/></svg></button>
+  </div>
+</div>
+<div class="layers glass" id="layers" role="group" aria-label="Map layers">
+  <label><input type="checkbox" data-l="smoke" checked> Smoke at ground level</label>
+  <label><input type="checkbox" data-l="fires" checked> Fires the count missed</label>
+  <label><input type="checkbox" data-l="counted" checked> Fires already counted</label>
+  <label><input type="checkbox" data-l="terrain" checked> 3D terrain</label>
+</div>
+<div class="legend glass" id="legend" aria-label="Legend"></div>
+
+<div class="timeline glass">
+  <button class="play" id="play" type="button" aria-label="Play the night">
+    <svg id="playicon" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg><span id="playlbl">Play</span>
+  </button>
+  <div class="clock"><b id="clock">--:--</b><span id="clockd">IST</span></div>
+  <div class="horizon" id="horizon" role="slider" tabindex="0" aria-label="Time of night"><svg id="hsvg" preserveAspectRatio="none"></svg></div>
 </div>
 
-<script>
-const $ = (s) => document.querySelector(s);
-const VIEW = { w: 72.8, e: 79.2, s: 27.7, n: 32.6 };
-const KX = Math.cos(30.1 * Math.PI / 180);
-const IST = 5.5 * 3600e3;
-const S = { d: null, borders: [], frame: 0, town: null, fire: null, playing: null, lang: "en", showAll: false };
+<div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="ev-h">
+  <div class="sheet-inner">
+    <button class="sheet-close" id="close-ev" type="button" aria-label="Close">✕</button>
+    <div class="eyebrow">Evidence · two seasons replayed on AWS</div>
+    <h2 id="ev-h">How we know it works</h2>
+    <p class="lede">Every image GK-2A took of Punjab and Haryana, 15 Oct – 30 Nov, in 2024 and 2025. Methods were tuned on 2024 and tested on 2025, a season they never saw — including the one place where Saanjh doesn't help.</p>
+    <div class="ev-grid" id="ev-grid"></div>
+  </div>
+</div>
+<div class="toast glass" id="toast" role="status"></div>
 
+<script>
+"use strict";
+const $ = (s) => document.querySelector(s);
+const IST = 5.5 * 3600e3;
+const Q = new URLSearchParams(location.search);
+const S = { day: Q.get("day") || "", d: null, plan: null, frames: [], t: 0, playing: false, tab: "towns", town: null, fire: null, showAll: false, lang: "en", is3d: true };
+const TOWNS = { Delhi: [28.61, 77.21], Gurugram: [28.46, 77.03], Noida: [28.54, 77.39], Ghaziabad: [28.67, 77.45], Faridabad: [28.41, 77.32], Meerut: [28.98, 77.71], Sonipat: [28.99, 77.02], Panipat: [29.39, 76.97], Karnal: [29.69, 76.99], Rohtak: [28.89, 76.61], Hisar: [29.15, 75.72], Sirsa: [29.53, 75.03], Ambala: [30.38, 76.78], Chandigarh: [30.73, 76.78], Patiala: [30.34, 76.39], Sangrur: [30.25, 75.84], Ludhiana: [30.9, 75.85], Jalandhar: [31.33, 75.58], Amritsar: [31.63, 74.87], Moga: [30.82, 75.17], Bathinda: [30.21, 74.95], Ferozepur: [30.93, 74.61], Muktsar: [30.47, 74.52], Fazilka: [30.4, 74.03], Fatehabad: [29.52, 75.45], Ratia: [29.69, 75.58], Tohana: [29.71, 75.9], Mansa: [29.99, 75.4], Barnala: [30.38, 75.55], Kaithal: [29.8, 76.4], Jind: [29.32, 76.31], "Tarn Taran": [31.45, 74.93], Kapurthala: [31.38, 75.38], Faridkot: [30.67, 74.76], Abohar: [30.14, 74.2], Malerkotla: [30.53, 75.88], Gurdaspur: [32.04, 75.4], Hoshiarpur: [31.53, 75.91], Rupnagar: [30.97, 76.53], Kurukshetra: [29.97, 76.85], Yamunanagar: [30.13, 77.27], Bhiwani: [28.79, 76.13], Ellenabad: [29.45, 74.66], "Talwandi Sabo": [29.98, 75.08] };
+const HOME = { center: [75.9, 29.95], zoom: 6.75, pitch: 52, bearing: -14 };
+const qs = (p) => (S.day ? `${p}?day=${S.day}` : p);
 const fmtIST = (ms) => new Date(ms + IST).toISOString().slice(11, 16);
 const dayIST = (ms) => new Date(ms + IST).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
-const frameTime = (k) => Date.parse(S.d.grid.t0) + k * 3600e3;
-const level = (p) => p >= 25 ? "alert" : p >= 10 ? "watch" : "low";
+const level = (p) => (p >= 25 ? "alert" : p >= 10 ? "watch" : "low");
 const LEVEL = { alert: "Alert", watch: "Watch", low: "Low" };
+const esc = (x) => String(x).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const lerp = (a, b, t) => a + (b - a) * t;
+const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+if (Q.get("layout") === "desktop") document.body.classList.add("force-desktop"); // for testing in a narrow window
+const mobile = () => innerWidth <= 860 && !document.body.classList.contains("force-desktop");
+function toast(msg) { const t = $("#toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove("show"), 4200); }
+const geo = (features) => ({ type: "FeatureCollection", features });
+const pt = (lon, lat, props) => ({ type: "Feature", geometry: { type: "Point", coordinates: [lon, lat] }, properties: props });
 
-Promise.all([fetch("tonight.json" + location.search).then(r => r.json()), fetch("borders.json").then(r => r.json())])
-  .then(([d, b]) => { S.d = d; S.borders = b; S.frames = d.frames.map(decode); init(); })
-  .catch(() => { $("#thesis").textContent = "Tonight's data hasn't been published yet. It updates every hour from 12:30 IST."; });
+/* ---------- black-body fire ramp, by fire power (MW) ---------- */
+const FIRE_RAMP = ["interpolate", ["linear"], ["get", "frp"], 0, "#8E2C1F", 15, "#D9492E", 45, "#F28A3B", 120, "#FFD08A"];
+function fireColor(frp) {
+  const st = [[0, [142, 44, 31]], [15, [217, 73, 46]], [45, [242, 138, 59]], [120, [255, 208, 138]]];
+  for (let i = 1; i < st.length; i++) if (frp <= st[i][0]) { const t = (frp - st[i - 1][0]) / (st[i][0] - st[i - 1][0]); return `rgb(${st[i - 1][1].map((c, k) => Math.round(lerp(c, st[i][1][k], t))).join(",")})`; }
+  return "rgb(255,208,138)";
+}
 
-function decode(b64) { const s = atob(b64), a = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) a[i] = s.charCodeAt(i); return a; }
-
-function init() {
-  const d = S.d, st = d.stats;
-  const dl = new Date(d.day).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
-  $("#day").textContent = d.replay ? `Replay of ${dl}` : `${dl} · updated ${fmtIST(Date.parse(d.generated))} IST`;
-  $("#thesis").innerHTML = `<em>${Math.round(st.uncounted_energy_share * 100)}%</em> of the farm-fire energy Saanjh saw ${d.replay ? "that day" : "today"} came after the satellites behind India's official count had passed.`;
-  $("#facts").innerHTML = [
-    `<span><b>${st.events}</b> fires seen</span>`,
-    `<span><b>${st.counted}</b> burning when the satellites passed</span>`,
-    `<span><b>${st.pm25_t} t</b> of PM2.5 released</span>`,
-    `<span><b>${(d.counted_cells || []).length}</b> fire cells already in the official count</span>`].join("");
-  const start = d.frames.findIndex((_, k) => new Date(frameTime(k) + IST).getUTCHours() === 21);
-  S.frame = start > 0 ? start : 0;
-  buildTowns(); buildFires(); buildStrip(); sizeMap(); draw();
-  window.addEventListener("resize", () => { sizeMap(); buildStrip(); draw(); });
+/* ---------- the sky follows the clock ---------- */
+const SKY = [ // IST hour (past midnight = +24) -> sky, horizon, fog
+  [12, "#5E8FB8", "#B9D2E2", "#7F98A8"], [15, "#557FA6", "#D9C7A8", "#8E9496"], [17, "#3A4F78", "#F2A65A", "#7E6461"],
+  [18, "#232B52", "#C9603E", "#4E4150"], [19.5, "#111B33", "#4B3352", "#26283A"], [22, "#07101F", "#18233B", "#121A29"],
+  [29.5, "#07101F", "#1E2C47", "#121A29"], [30.5, "#1E3256", "#C9784A", "#3F4250"], [32, "#4E7FAE", "#E6C9A3", "#8D9AA4"]];
+const hex = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+const mixc = (a, b, t) => "#" + hex(a).map((v, i) => Math.round(lerp(v, hex(b)[i], t)).toString(16).padStart(2, "0")).join("");
+function skyAt(h) {
+  h = Math.max(SKY[0][0], Math.min(SKY[SKY.length - 1][0], h));
+  for (let i = 1; i < SKY.length; i++) if (h <= SKY[i][0]) { const t = (h - SKY[i - 1][0]) / (SKY[i][0] - SKY[i - 1][0]); return [1, 2, 3].map((k) => mixc(SKY[i - 1][k], SKY[i][k], t)); }
 }
 
 /* ---------- map ---------- */
-const cv = $("#map"), ctx = cv.getContext("2d");
-let W = 900, H = 660;
-function sizeMap() {
-  const r = cv.parentElement.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
-  W = r.width; H = W * (VIEW.n - VIEW.s) / ((VIEW.e - VIEW.w) * KX);
-  cv.width = W * dpr; cv.height = H * dpr; cv.style.height = H + "px";
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-}
-const px = (lon) => (lon - VIEW.w) / (VIEW.e - VIEW.w) * W;
-const py = (lat) => (VIEW.n - lat) / (VIEW.n - VIEW.s) * H;
+const map = new maplibregl.Map({ container: "map", style: "https://tiles.openfreemap.org/styles/dark", ...HOME, maxPitch: 78, minZoom: 4.5, attributionControl: { compact: true } });
+const padding = () => (mobile() ? { top: 120, bottom: innerHeight * 0.45, left: 20, right: 20 } : { left: 430, top: 80, bottom: 110, right: 70 });
+map.setPadding(padding());
+let styleReady = false, dataReady = false;
+map.once("style.load", () => { styleReady = true; if (dataReady) onStyle(); });
 
-const smokeCv = document.createElement("canvas");
-function draw() {
-  const d = S.d; if (!d) return;
-  ctx.fillStyle = "#141A33"; ctx.fillRect(0, 0, W, H);
-  // smoke: grid row 0 is the southern edge
-  const g = d.grid, f = S.frames[S.frame];
-  smokeCv.width = g.nx; smokeCv.height = g.ny;
-  const sc = smokeCv.getContext("2d"), img = sc.createImageData(g.nx, g.ny);
+function recolorBasemap() {
+  for (const l of map.getStyle().layers) {
+    const sl = l["source-layer"], set = (p, v) => { try { map.setPaintProperty(l.id, p, v); } catch (e) {} }, hide = () => map.setLayoutProperty(l.id, "visibility", "none");
+    if (l.type === "background") set("background-color", "#081822");
+    else if (l.type === "raster") set("raster-opacity", 0.15);
+    else if (["poi", "aeroway", "housenumber", "mountain_peak", "aerodrome_label", "building"].includes(sl)) hide();
+    else if (sl === "water" && l.type === "fill") set("fill-color", "#0B2A3A");
+    else if (sl === "waterway" && l.type === "line") set("line-color", "#12405A");
+    else if (["landcover", "landuse", "park"].includes(sl) && l.type === "fill") { set("fill-color", "#0E2230"); set("fill-opacity", 0.45); }
+    else if (sl === "transportation" && l.type === "line") set("line-color", "rgba(150,196,222,0.15)");
+    else if (sl === "boundary" && l.type === "line") set("line-color", "rgba(244,162,89,0.28)");
+    if (l.type === "symbol") { set("text-color", "#7F97A6"); set("text-halo-color", "#07131C"); set("text-halo-width", 1.2); }
+  }
+  // fewer basemap labels: villages and hamlets only once you are close, road names at street level
+  const zr = { place_other: 13, place_suburb: 12, place_village: 11.5, highway_name_other: 12.5, highway_name_motorway: 11, water_name: 9 };
+  for (const [id, z] of Object.entries(zr)) if (map.getLayer(id)) map.setLayerZoomRange(id, z, 24);
+}
+function addBase() {
+  const tiles = ["https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png"];
+  map.addSource("dem", { type: "raster-dem", tiles, encoding: "terrarium", tileSize: 256, maxzoom: 12, attribution: "Terrain: Mapzen terrain tiles, AWS Open Data" });
+  map.addSource("dem-shade", { type: "raster-dem", tiles, encoding: "terrarium", tileSize: 256, maxzoom: 12 });
+  const firstSymbol = map.getStyle().layers.find((l) => l.type === "symbol")?.id;
+  map.addLayer({ id: "hillshade", type: "hillshade", source: "dem-shade", paint: { "hillshade-shadow-color": "#02070B", "hillshade-highlight-color": "#3B5A70", "hillshade-accent-color": "#0A1A24", "hillshade-exaggeration": 0.55 } }, firstSymbol);
+  map.setTerrain({ source: "dem", exaggeration: 2.2 });
+}
+
+/* ---------- smoke: a canvas source, interpolated between hourly frames on every animation frame ---------- */
+const sc = $("#smoke-canvas"), sctx = sc.getContext("2d");
+const low = document.createElement("canvas"), lctx = low.getContext("2d");
+let lowImg = null;
+function decode(b64) { const s = atob(b64), a = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) a[i] = s.charCodeAt(i); return a; }
+function drawSmoke() {
+  const g = S.d?.grid; if (!g || !S.frames.length) return;
+  if (!lowImg) { low.width = g.nx; low.height = g.ny; lowImg = lctx.createImageData(g.nx, g.ny); }
+  const k = Math.min(Math.floor(S.t), S.frames.length - 1), f = S.t - k, A = S.frames[k], B = S.frames[Math.min(k + 1, S.frames.length - 1)], px = lowImg.data;
   for (let y = 0; y < g.ny; y++) for (let x = 0; x < g.nx; x++) {
-    const v = f[y * g.nx + x], o = ((g.ny - 1 - y) * g.nx + x) * 4;
-    const a = Math.max(0, Math.min(1, (v - 125) / 105));     // ~0.3 to ~40 ug/m3
-    img.data[o] = 185 + a * 50; img.data[o + 1] = 167 + a * 40; img.data[o + 2] = 214 + a * 30; img.data[o + 3] = a * 235;
+    const i = y * g.nx + x, v = A[i] + (B[i] - A[i]) * f, o = ((g.ny - 1 - y) * g.nx + x) * 4, a = Math.max(0, Math.min(1, (v - 128) / 100));
+    px[o] = 240 - 74 * a; px[o + 1] = 224 - 124 * a; px[o + 2] = 210 - 116 * a; px[o + 3] = Math.pow(a, 0.8) * 228;
   }
-  sc.putImageData(img, 0, 0);
-  ctx.imageSmoothingEnabled = true;
-  if (S.tab !== "plan") ctx.drawImage(smokeCv, px(g.lon0), py(g.lat0 + g.ny * g.d), px(g.lon0 + g.nx * g.d) - px(g.lon0), py(g.lat0) - py(g.lat0 + g.ny * g.d));
-  // borders
-  ctx.lineWidth = 1;
-  for (const r of S.borders) {
-    ctx.strokeStyle = r.c === "PAK" ? "rgba(201,198,218,.18)" : "rgba(201,198,218,.34)";
-    ctx.beginPath(); r.p.forEach(([x, y], i) => i ? ctx.lineTo(px(x), py(y)) : ctx.moveTo(px(x), py(y))); ctx.stroke();
-  }
-  if (S.tab === "plan") { drawPlan(); drawTowns(); drawPlayhead(); return; }
-  // fires the official count already has (VIIRS overpass), small and quiet
-  ctx.fillStyle = "rgba(78,143,208,.6)";
-  for (const [la, lo] of (d.counted_cells || [])) { ctx.beginPath(); ctx.arc(px(lo), py(la), 2.2, 0, 7); ctx.fill(); }
-  // fires: lit only once first seen at the current frame time
-  const now = frameTime(S.frame), tot = d.stats.harm_total;
-  d.fires.forEach((fr, i) => {
-    const lit = firstSeenMs(fr) <= now, r = 3 + Math.sqrt(fr.harm / tot) * 34;
-    ctx.globalAlpha = lit ? 1 : .22;
-    ctx.fillStyle = fr.counted ? "#4E8FD0" : "#EE5A24";
-    ctx.beginPath(); ctx.arc(px(fr.lon), py(fr.lat), r, 0, 7); ctx.fill();
-    if (S.fire === i) { ctx.globalAlpha = 1; ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(px(fr.lon), py(fr.lat), r + 5, 0, 7); ctx.stroke(); }
-  });
-  ctx.globalAlpha = 1;
-  drawTowns();
-  $("#clock").textContent = fmtIST(now);
-  $("#clockd").textContent = dayIST(now) + " IST";
-  drawPlayhead();
+  lctx.putImageData(lowImg, 0, 0);
+  sctx.clearRect(0, 0, sc.width, sc.height);
+  sctx.filter = "blur(9px)"; sctx.imageSmoothingQuality = "high";
+  sctx.drawImage(low, 0, 0, sc.width, sc.height);
+  sctx.filter = "none";
 }
-function drawTowns() {
-  ctx.font = "500 12px 'Spline Sans Mono', monospace";
-  for (const t of S.d.towns) {
-    const [la, lo] = TOWNS[t.town] || []; if (!la) continue;
-    const sel = S.town === t.town;
-    ctx.fillStyle = sel ? "#fff" : "rgba(233,231,243,.85)";
-    ctx.beginPath(); ctx.arc(px(lo), py(la), sel ? 4 : 2.5, 0, 7); ctx.fill();
-    if (sel || t.peak_ugm3 >= 10 || ["Delhi", "Ludhiana", "Amritsar", "Chandigarh"].includes(t.town)) ctx.fillText(t.town, px(lo) + 6, py(la) - 5);
-  }
-}
-const TOWNS = { Delhi: [28.61, 77.21], Gurugram: [28.46, 77.03], Noida: [28.54, 77.39], Ghaziabad: [28.67, 77.45], Faridabad: [28.41, 77.32], Meerut: [28.98, 77.71], Sonipat: [28.99, 77.02], Panipat: [29.39, 76.97], Karnal: [29.69, 76.99], Rohtak: [28.89, 76.61], Hisar: [29.15, 75.72], Sirsa: [29.53, 75.03], Ambala: [30.38, 76.78], Chandigarh: [30.73, 76.78], Patiala: [30.34, 76.39], Sangrur: [30.25, 75.84], Ludhiana: [30.90, 75.85], Jalandhar: [31.33, 75.58], Amritsar: [31.63, 74.87], Moga: [30.82, 75.17], Bathinda: [30.21, 74.95], Ferozepur: [30.93, 74.61], Muktsar: [30.47, 74.52], Fazilka: [30.40, 74.03], "Fatehabad": [29.52, 75.45], "Ratia": [29.69, 75.58], "Tohana": [29.71, 75.9], "Mansa": [29.99, 75.4], "Barnala": [30.38, 75.55], "Kaithal": [29.8, 76.4], "Jind": [29.32, 76.31], "Tarn Taran": [31.45, 74.93], "Kapurthala": [31.38, 75.38], "Faridkot": [30.67, 74.76], "Abohar": [30.14, 74.2], "Malerkotla": [30.53, 75.88], "Gurdaspur": [32.04, 75.4], "Hoshiarpur": [31.53, 75.91], "Rupnagar": [30.97, 76.53], "Kurukshetra": [29.97, 76.85], "Yamunanagar": [30.13, 77.27], "Bhiwani": [28.79, 76.13], "Ellenabad": [29.45, 74.66], "Talwandi Sabo": [29.98, 75.08] };
-function firstSeenMs(fr) { const [h, m] = fr.first_ist.split(":").map(Number); return Date.parse(S.d.day + "T00:00Z") + (h * 60 + m) * 60e3 - IST; }
 
-cv.addEventListener("pointermove", (e) => {
-  const r = cv.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
-  const i = nearestFire(x, y), tip = $("#tip");
-  if (i < 0) { tip.style.display = "none"; return; }
-  const fr = S.d.fires[i];
-  tip.style.display = "block"; tip.style.left = px(fr.lon) + "px"; tip.style.top = py(fr.lat) + "px";
-  tip.textContent = `#${i + 1} near ${fr.near} · first seen ${fr.first_ist} · ${fr.counted ? "counted" : "missed by the count"}`;
-});
-cv.addEventListener("pointerleave", () => $("#tip").style.display = "none");
-cv.addEventListener("click", (e) => { const r = cv.getBoundingClientRect(), i = nearestFire(e.clientX - r.left, e.clientY - r.top); if (i >= 0) { selectTab("off"); selectFire(i); } });
-function nearestFire(x, y) { let best = -1, bd = 14 * 14; S.d.fires.forEach((f, i) => { const dd = (px(f.lon) - x) ** 2 + (py(f.lat) - y) ** 2; if (dd < bd) { bd = dd; best = i; } }); return best; }
+function addDataLayers() {
+  const g = S.d.grid, tot = S.d.stats.harm_total, before = map.getStyle().layers.find((l) => l.type === "symbol")?.id;
+  map.addSource("smoke", { type: "canvas", canvas: sc, animate: true, coordinates: [[g.lon0, g.lat0 + g.ny * g.d], [g.lon0 + g.nx * g.d, g.lat0 + g.ny * g.d], [g.lon0 + g.nx * g.d, g.lat0], [g.lon0, g.lat0]] });
+  map.addLayer({ id: "smoke", type: "raster", source: "smoke", paint: { "raster-opacity": SMOKE_OPACITY, "raster-fade-duration": 0, "raster-resampling": "linear" } }, before);
 
-/* ---------- night strip ---------- */
-const strip = $("#strip");
-function sky(hIST) {  // colour of the sky over Punjab in November at this hour
-  const h = (hIST + 24) % 24;
-  if (h >= 7 && h < 16) return "#8C7A45";
-  if (h >= 16 && h < 17.5) return "#A0522D";
-  if (h >= 17.5 && h < 18.5) return "#4B2C4F";
-  if (h >= 6 && h < 7) return "#4B3B5C";
-  return "#1D2345";
-}
-function buildStrip() {
-  if (!S.d) return;
-  const n = S.frames.length, w = strip.getBoundingClientRect().width || 600, h = 104, bandY = 52, bandH = 22;
-  const xk = (k) => k / (n - 1) * w;
-  let s = "";
-  for (let k = 0; k < n - 1; k++) { const hh = new Date(frameTime(k) + IST).getUTCHours(); s += `<rect x="${xk(k)}" y="${bandY}" width="${xk(k + 1) - xk(k) + .5}" height="${bandH}" fill="${sky(hh)}"/>`; }
-  // first-seen ticks above the band, one per fire event, binned by the hour it was first seen
-  const t0 = frameTime(0), hist = S.d.stats.first_seen, maxc = Math.max(...Object.values(hist));
-  for (const [hm, c] of Object.entries(hist)) {
-    const [hh, mm] = hm.split(":").map(Number), ms = Date.parse(S.d.day + "T00:00Z") + (hh * 60 + mm) * 60e3 - IST;
-    const k = (ms - t0) / 3600e3; if (k < 0 || k > n - 1) continue;
-    const bh = 4 + c / maxc * 34;
-    s += `<rect x="${xk(k) + 1}" y="${bandY - bh - 2}" width="${Math.max(3, w / n - 3)}" height="${bh}" fill="#EE5A24" rx="1.5"><title>${c} fires first seen ${hm}</title></rect>`;
-  }
-  // where the polar satellites pass
-  const pass = Date.parse(S.d.day + "T08:00Z"), kp = (pass - t0) / 3600e3;
-  if (kp >= 0) s += `<line x1="${xk(kp)}" x2="${xk(kp)}" y1="2" y2="${bandY + bandH + 4}" stroke="#4E8FD0" stroke-width="1.5" stroke-dasharray="3 3"/><text x="${xk(kp) + 5}" y="10" style="fill:#8DB8E8">satellites pass ${fmtIST(pass)}</text>`;
-  // hour labels
-  for (let k = 0; k < n; k += 3) s += `<text x="${xk(k)}" y="${h - 8}" text-anchor="${k ? "middle" : "start"}">${fmtIST(frameTime(k))}</text>`;
-  if (S.town) { const t = S.d.towns.find(t => t.town === S.town); const k = kFromLabel(t.arrives_ist); if (k >= 0) s += `<path d="M${xk(k)} ${bandY + bandH + 2} l-5 8 h10z" fill="#B9A7D6"/><text x="${xk(k) + 8}" y="${bandY + bandH + 10}" style="fill:#B9A7D6">smoke reaches ${S.town}</text>`; }
-  s += `<line id="ph" y1="14" y2="${bandY + bandH + 2}" stroke="#fff" stroke-width="2"/>`;
-  strip.setAttribute("viewBox", `0 0 ${w} ${h}`); strip.innerHTML = s;
-  strip.setAttribute("aria-valuemax", n - 1);
-  drawPlayhead();
-}
-function kFromLabel(lbl) { if (!lbl) return -1; const hm = lbl.slice(-5); for (let k = 0; k < S.frames.length; k++) if (fmtIST(frameTime(k)) === hm && k >= 0) return k; return -1; }
-function drawPlayhead() {
-  const ph = strip.querySelector("#ph"); if (!ph) return;
-  const w = strip.viewBox.baseVal.width, x = S.frame / (S.frames.length - 1) * w;
-  ph.setAttribute("x1", x); ph.setAttribute("x2", x);
-  strip.setAttribute("aria-valuenow", S.frame); strip.setAttribute("aria-valuetext", fmtIST(frameTime(S.frame)) + " IST");
-}
-function scrub(e) { const r = strip.getBoundingClientRect(); setFrame(Math.round((e.clientX - r.left) / r.width * (S.frames.length - 1))); }
-strip.addEventListener("pointerdown", (e) => { stop(); strip.setPointerCapture(e.pointerId); scrub(e); });
-strip.addEventListener("pointermove", (e) => { if (e.buttons) scrub(e); });
-strip.addEventListener("keydown", (e) => { if (e.key === "ArrowRight") setFrame(S.frame + 1); if (e.key === "ArrowLeft") setFrame(S.frame - 1); });
-function setFrame(k) { S.frame = Math.max(0, Math.min(S.frames.length - 1, k)); draw(); }
-function stop() { clearInterval(S.playing); S.playing = null; $("#play").textContent = "Play the night"; }
-$("#play").addEventListener("click", () => {
-  if (S.playing) return stop();
-  if (S.frame >= S.frames.length - 1) S.frame = 0;
-  const step = matchMedia("(prefers-reduced-motion: reduce)").matches ? 900 : 380;
-  S.playing = setInterval(() => S.frame >= S.frames.length - 1 ? stop() : setFrame(S.frame + 1), step);
-  $("#play").textContent = "Pause";
-});
+  map.addSource("states", { type: "geojson", data: geo((S.borders || []).map((r) => ({ type: "Feature", geometry: { type: "LineString", coordinates: r.p }, properties: {} }))) });
+  map.addLayer({ id: "states", type: "line", source: "states", paint: { "line-color": "rgba(244,162,89,0.4)", "line-width": ["interpolate", ["linear"], ["zoom"], 5, 0.6, 9, 1.4], "line-dasharray": [3, 2] } });
 
-/* ---------- residents ---------- */
+  // fires already counted: cool rings, only once zoomed in (many and small)
+  map.addSource("counted", { type: "geojson", data: geo((S.d.counted_cells || []).map(([la, lo]) => pt(lo, la, {}))) });
+  map.addLayer({ id: "counted", type: "circle", source: "counted", minzoom: 7.4, paint: {
+    "circle-radius": ["interpolate", ["linear"], ["zoom"], 7.4, 1.6, 11, 4.5], "circle-color": "rgba(0,0,0,0)", "circle-stroke-color": "#8FD6EA",
+    "circle-stroke-width": ["interpolate", ["linear"], ["zoom"], 7.4, 0.8, 11, 1.6], "circle-stroke-opacity": ["interpolate", ["linear"], ["zoom"], 7.4, 0, 8.2, 0.45, 11, 0.7] } });
+
+  // fires the count missed: clustered when zoomed out, glowing points when zoomed in
+  const feats = S.d.fires.map((f, i) => ({ ...pt(f.lon, f.lat, { i, frp: f.frp_peak, share: f.harm / tot }), id: i }));
+  map.addSource("fires", { type: "geojson", data: geo(feats), cluster: true, clusterRadius: 48, clusterMaxZoom: 9, clusterProperties: { frp: ["max", ["get", "frp"]] } });
+  map.addLayer({ id: "cl-glow", type: "circle", source: "fires", filter: ["has", "point_count"], paint: { "circle-radius": ["interpolate", ["linear"], ["get", "point_count"], 2, 24, 20, 44], "circle-color": FIRE_RAMP, "circle-opacity": 0.2, "circle-blur": 0.9 } });
+  map.addLayer({ id: "cl", type: "circle", source: "fires", filter: ["has", "point_count"], paint: { "circle-radius": ["interpolate", ["linear"], ["get", "point_count"], 2, 13, 20, 23], "circle-color": "rgba(12,29,41,0.88)", "circle-stroke-color": FIRE_RAMP, "circle-stroke-width": 2 } });
+  map.addLayer({ id: "cl-n", type: "symbol", source: "fires", filter: ["has", "point_count"], layout: { "text-field": ["get", "point_count_abbreviated"], "text-font": ["Noto Sans Bold"], "text-size": 12, "text-allow-overlap": true }, paint: { "text-color": "#FFE6C7" } });
+  map.addLayer({ id: "fire-glow", type: "circle", source: "fires", filter: ["!", ["has", "point_count"]], paint: { "circle-radius": ["interpolate", ["linear"], ["get", "share"], 0, 9, 0.03, 24], "circle-color": FIRE_RAMP, "circle-blur": 1, "circle-opacity": 0.55 } });
+  map.addLayer({ id: "fire", type: "circle", source: "fires", filter: ["!", ["has", "point_count"]], paint: { "circle-radius": ["interpolate", ["linear"], ["get", "share"], 0, 3.2, 0.03, 7.5], "circle-color": FIRE_RAMP, "circle-stroke-color": "#FFF2DD", "circle-stroke-width": ["case", ["boolean", ["feature-state", "sel"], false], 2.6, 0.6] } });
+
+  map.addSource("pulse", { type: "geojson", data: geo([]) });
+  map.addLayer({ id: "pulse", type: "circle", source: "pulse", paint: { "circle-radius": 10, "circle-color": "rgba(0,0,0,0)", "circle-stroke-color": "#FFD08A", "circle-stroke-width": 2, "circle-stroke-opacity": 0.8, "circle-pitch-alignment": "map" } });
+
+  // smoke paths: animated arcs from the fires behind a town's smoke to the town
+  map.addSource("arcs", { type: "geojson", data: geo([]) });
+  map.addLayer({ id: "arcs-base", type: "line", source: "arcs", layout: { "line-cap": "round" }, paint: { "line-color": "#E9D3C1", "line-opacity": 0.22, "line-width": ["interpolate", ["linear"], ["get", "share"], 0, 1.5, 0.3, 7] } });
+  map.addLayer({ id: "arcs", type: "line", source: "arcs", layout: { "line-cap": "round" }, paint: { "line-color": "#FFD9B0", "line-width": ["interpolate", ["linear"], ["get", "share"], 0, 1.2, 0.3, 3.6], "line-dasharray": [0, 4, 3] } });
+  map.addSource("origins", { type: "geojson", data: geo([]) });
+  map.addLayer({ id: "origins", type: "circle", source: "origins", paint: { "circle-radius": ["interpolate", ["linear"], ["get", "share"], 0, 6, 0.3, 16], "circle-color": "rgba(255,208,138,0.12)", "circle-stroke-color": "#FFD08A", "circle-stroke-width": 1.6 } });
+  map.addLayer({ id: "origins-l", type: "symbol", source: "origins", layout: { "text-field": ["concat", ["to-string", ["round", ["*", 100, ["get", "share"]]]], "%"], "text-font": ["Noto Sans Bold"], "text-size": 11, "text-offset": [0, -1.6] }, paint: { "text-color": "#FFE6C7", "text-halo-color": "#07131C", "text-halo-width": 1.4 } });
+
+  // towns: coloured by tonight's level; labels collide instead of piling up
+  map.addSource("towns", { type: "geojson", data: geo(S.d.towns.filter((t) => TOWNS[t.town]).map((t) => pt(TOWNS[t.town][1], TOWNS[t.town][0], { name: t.town, lvl: level(t.peak_ugm3) }))) });
+  map.addLayer({ id: "town-dot", type: "circle", source: "towns", paint: { "circle-radius": ["match", ["get", "lvl"], "alert", 6, "watch", 5, 3.2], "circle-color": ["match", ["get", "lvl"], "alert", "#FF6F61", "watch", "#F6C453", "#A9BCC8"], "circle-stroke-color": "#07131C", "circle-stroke-width": 1.5 } });
+  map.addLayer({ id: "town-l", type: "symbol", source: "towns", layout: { "text-field": ["get", "name"], "text-font": ["Noto Sans Bold"], "text-size": ["match", ["get", "lvl"], "alert", 14, "watch", 13, 11.5], "text-offset": [0, 1.1], "text-anchor": "top", "symbol-sort-key": ["match", ["get", "lvl"], "alert", 0, "watch", 1, 2], "text-padding": 8 }, paint: { "text-color": ["match", ["get", "lvl"], "alert", "#FFD2CC", "watch", "#FBE6B4", "#B9C8D2"], "text-halo-color": "#07131C", "text-halo-width": 1.6 } });
+
+  // plan: 3D risk columns, patrol blocks, fires that actually burned
+  map.addSource("risk", { type: "geojson", data: geo([]) });
+  map.addLayer({ id: "risk", type: "fill-extrusion", source: "risk", layout: { visibility: "none" }, paint: { "fill-extrusion-color": ["interpolate", ["linear"], ["get", "v"], 0, "#5A1F1A", 0.15, "#B33A26", 0.45, "#F28A3B", 1, "#FFD08A"], "fill-extrusion-height": ["*", ["get", "v"], 45000], "fill-extrusion-opacity": 0.86 } });
+  map.addSource("blocks", { type: "geojson", data: geo([]) });
+  map.addLayer({ id: "blocks", type: "line", source: "blocks", layout: { visibility: "none" }, filter: ["==", ["geometry-type"], "LineString"], paint: { "line-color": "#8FD6EA", "line-width": 2, "line-opacity": 0.9 } });
+  map.addLayer({ id: "blocks-n", type: "symbol", source: "blocks", layout: { visibility: "none", "text-field": ["get", "n"], "text-font": ["Noto Sans Bold"], "text-size": 13, "text-allow-overlap": true }, filter: ["==", ["geometry-type"], "Point"], paint: { "text-color": "#07131C", "text-halo-color": "#8FD6EA", "text-halo-width": 3 } });
+  map.addSource("actual", { type: "geojson", data: geo([]) });
+  map.addLayer({ id: "actual", type: "circle", source: "actual", layout: { visibility: "none" }, paint: { "circle-radius": ["interpolate", ["linear"], ["zoom"], 6, 1.5, 10, 4], "circle-color": "#F4F6F7", "circle-opacity": 0.85 } });
+
+  map.on("click", "cl", (e) => { const f = e.features[0]; map.getSource("fires").getClusterExpansionZoom(f.properties.cluster_id).then((z) => map.easeTo({ center: f.geometry.coordinates, zoom: z + 0.5, duration: 900 })); });
+  map.on("click", "fire", (e) => { selectTab("fires"); selectFire(e.features[0].properties.i, true); });
+  map.on("click", "town-dot", (e) => { selectTab("towns"); selectTown(e.features[0].properties.name, true); });
+  for (const id of ["cl", "fire", "town-dot"]) { map.on("mouseenter", id, () => (map.getCanvas().style.cursor = "pointer")); map.on("mouseleave", id, () => (map.getCanvas().style.cursor = "")); }
+  const hover = new maplibregl.Popup({ closeButton: false, closeOnClick: false, offset: 16 });
+  map.on("mousemove", "fire", (e) => { const i = e.features[0].properties.i, f = S.d.fires[i]; hover.setLngLat(e.features[0].geometry.coordinates).setHTML(`<div class="pop"><b>#${i + 1} · ${esc(f.near)}</b><div class="fine">${f.source === "VIIRS" ? "counted at the 13:30 pass" : `first seen ${f.first_ist} · missed by the count`} · ${(f.harm / tot * 100).toFixed(1)}% of exposure</div></div>`).addTo(map); });
+  map.on("mouseleave", "fire", () => hover.remove());
+}
+
+/* ---------- data ---------- */
+async function getJSON(u) { const r = await fetch(u); if (!r.ok) throw new Error(u + " " + r.status); return r.json(); }
+async function loadDays() {
+  const sel = $("#day");
+  sel.innerHTML = `<option value="">Live · tonight</option>`;
+  try {
+    const d = await getJSON("days.json"), by = {};
+    for (const x of d.replays) (by[x.slice(0, 4)] ||= []).push(x);
+    for (const [y, xs] of Object.entries(by).sort().reverse())
+      sel.insertAdjacentHTML("beforeend", `<optgroup label="${y} season replay">${xs.map((x) => `<option value="${x}">${new Date(x).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}${d.plans.includes(x) ? " · with plan" : ""}</option>`).join("")}</optgroup>`);
+  } catch (e) { for (const x of ["2025-11-10", "2024-11-18"]) sel.insertAdjacentHTML("beforeend", `<option value="${x}">${x}</option>`); }
+  if (S.day && ![...sel.options].some((o) => o.value === S.day)) sel.insertAdjacentHTML("beforeend", `<option value="${S.day}">${S.day}</option>`);
+  sel.value = S.day;
+  sel.addEventListener("change", () => { const u = new URL(location); sel.value ? u.searchParams.set("day", sel.value) : u.searchParams.delete("day"); location.href = u; });
+}
+const frameTime = (k) => Date.parse(S.d.grid.t0) + k * 3600e3;
+async function load() {
+  loadDays();
+  const [d, borders] = await Promise.all([getJSON(qs("tonight.json")), getJSON("borders.json")]);
+  S.d = d; S.borders = borders; S.frames = d.frames.map(decode);
+  try { S.plan = await getJSON(qs("plan.json")); } catch (e) { S.plan = null; }
+  const k21 = S.frames.findIndex((_, k) => new Date(frameTime(k) + IST).getUTCHours() === 21);
+  S.t = k21 > 0 ? k21 : 0;
+  renderHero(); buildTowns(); buildFires(); buildHorizon(); renderLegend(); renderPlan(true);
+  dataReady = true; if (styleReady) onStyle();
+}
+function onStyle() {
+  recolorBasemap(); addBase(); addDataLayers(); drawSmoke(); applySky(true); requestAnimationFrame(tick);
+  setTimeout(() => $("#loader").classList.add("done"), 350);
+  if (!reduceMotion) { map.jumpTo({ center: [77.2, 28.9], zoom: 5.2, pitch: 0, bearing: 0 }); map.flyTo({ ...HOME, duration: 3400, curve: 1.3, essential: true }); }
+}
+
+/* ---------- hero ---------- */
+function countUp(el, to, fmt, ms = 1200) {
+  if (reduceMotion) { el.textContent = fmt(to); return; }
+  const t0 = performance.now(); const step = (now) => { const p = Math.min(1, (now - t0) / ms), e = 1 - Math.pow(1 - p, 3); el.textContent = fmt(to * e); if (p < 1) requestAnimationFrame(step); }; requestAnimationFrame(step);
+}
+function renderHero() {
+  const st = S.d.stats;
+  $("#nightlabel").textContent = new Date(S.d.day).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "long", year: "numeric" });
+  $("#modepill").textContent = S.d.replay ? "replay" : "live";
+  $("#livedot").classList.toggle("on", !S.d.replay);
+  countUp($("#bigshare"), st.uncounted_energy_share * 100, (v) => `${Math.round(v)}%`);
+  countUp($("#k-fires"), st.events, (v) => Math.round(v).toLocaleString("en-IN"));
+  countUp($("#k-counted"), st.counted, (v) => Math.round(v).toLocaleString("en-IN"));
+  countUp($("#k-pm"), st.pm25_t, (v) => `${Math.round(v)} t`);
+  $("#townlist").innerHTML = Object.keys(TOWNS).sort().map((t) => `<option value="${t}">`).join("");
+}
+
+/* ---------- tabs ---------- */
+const TABS = ["towns", "fires", "teams"];
+const layerOn = { smoke: true, fires: true, counted: true, terrain: true };
+const SMOKE_OPACITY = ["interpolate", ["linear"], ["zoom"], 6, 0.92, 8.5, 0.6, 10, 0.3, 12, 0.14]; // a regional haze, not a wash over villages
+function vis(id, on) { if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", on ? "visible" : "none"); }
+function syncLayers() {
+  const plan = S.tab === "teams";
+  ["risk", "blocks", "blocks-n", "actual"].forEach((id) => vis(id, plan));
+  ["cl", "cl-glow", "cl-n", "fire", "fire-glow"].forEach((id) => vis(id, !plan && layerOn.fires));
+  ["arcs", "arcs-base", "origins", "origins-l"].forEach((id) => vis(id, !plan));
+  vis("counted", !plan && layerOn.counted);
+  if (map.getLayer("smoke")) map.setPaintProperty("smoke", "raster-opacity", !layerOn.smoke ? 0 : plan ? 0.22 : SMOKE_OPACITY);
+}
+function selectTab(t) {
+  S.tab = t;
+  TABS.forEach((x, i) => { $("#t-" + x).setAttribute("aria-selected", x === t); $("#p-" + x).hidden = x !== t; if (x === t) $("#tabslider").style.transform = `translateX(${i * 100}%)`; });
+  syncLayers(); renderLegend();
+  if (t === "teams") { renderPlan(); if (S.plan) map.easeTo({ pitch: 60, bearing: -26, zoom: 6.9, center: [75.4, 30.0], duration: 1600 }); }
+}
+TABS.forEach((t) => $("#t-" + t).addEventListener("click", () => selectTab(t)));
+
+/* ---------- towns ---------- */
 function buildTowns() {
   const smoky = (t) => level(t.peak_ugm3) !== "low";
-  const ts = [...S.d.towns].sort((a, b) => smoky(b) - smoky(a) || (kFromLabel(a.arrives_ist) - kFromLabel(b.arrives_ist)) || b.peak_ugm3 - a.peak_ugm3);
-  const shown = ts.filter(t => smoky(t) || S.allTowns || t.town === S.town), hiddenN = ts.length - shown.length;
-  $("#towns").innerHTML = shown.map(t => `<li><button type="button" data-town="${t.town}" aria-pressed="${S.town === t.town}">
-      <span class="name">${t.town}</span><span class="when">${smoky(t) ? "from " + t.arrives_ist.slice(-5) : "little smoke"}</span>
-      <span class="lvl ${level(t.peak_ugm3)}">${LEVEL[level(t.peak_ugm3)]}</span></button></li>`).join("")
-    + (hiddenN ? `<li><button type="button" class="link" id="alltowns">Show ${hiddenN} towns with little farm smoke</button></li>` : "");
-  const at = $("#alltowns"); if (at) at.addEventListener("click", () => { S.allTowns = true; buildTowns(); });
-  $("#towns").querySelectorAll("button").forEach(b => b.addEventListener("click", () => selectTown(b.dataset.town)));
-  renderNotice();
+  const ts = S.d.towns.filter((t) => TOWNS[t.town]).sort((a, b) => smoky(b) - smoky(a) || b.peak_ugm3 - a.peak_ugm3);
+  const shown = ts.filter((t) => smoky(t) || S.allTowns || t.town === S.town), hidden = ts.length - shown.length;
+  $("#towns").innerHTML = shown.map((t, i) => { const lv = level(t.peak_ugm3), p = t.members ? (lv === "alert" ? t.p_alert : t.p_watch) : null;
+    return `<li style="--i:${i}"><button class="row" type="button" data-town="${esc(t.town)}" aria-pressed="${S.town === t.town}">
+    <span class="t">${esc(t.town)}</span><span class="lvl ${lv}">${LEVEL[lv]}${p != null && lv !== "low" ? ` · ${Math.round(p * 100)}%` : ""}</span>
+    <span class="s">${smoky(t) && t.arrives_ist ? `from ${t.arrives_ist.slice(-5)} · +${Math.round(t.peak_ugm3)} µg/m³ at peak` : "little farm smoke"}</span></button></li>`; }).join("")
+    + (hidden ? `<li><button class="more-btn" id="alltowns" type="button">Show ${hidden} towns with little farm smoke</button></li>` : "");
+  $("#towns").querySelectorAll(".row").forEach((b) => b.addEventListener("click", () => selectTown(b.dataset.town, true)));
+  $("#alltowns")?.addEventListener("click", () => { S.allTowns = true; buildTowns(); });
 }
-function selectTown(name) {
-  S.town = name; const t = S.d.towns.find(t => t.town === name), k = kFromLabel(t.peak_ist);
-  if (k >= 0) S.frame = k;
-  buildTowns(); buildStrip(); draw();
-}
-const MSG = {  // says what the evidence supports: where and when farm smoke goes, not that the morning will be bad
+const MSG = {
   en: (t) => `Farm-fire smoke is heading to ${t.town} tonight. It should arrive around ${t.arrives_ist.slice(-5)} and be heaviest around ${t.peak_ist.slice(-5)}. Before tomorrow's morning assembly, check the PM2.5 reading; if it is above 90, hold assembly indoors.`,
   hi: (t) => `${t.town} की ओर आज रात पराली का धुआँ आ रहा है। यह लगभग ${t.arrives_ist.slice(-5)} बजे पहुँचेगा और ${t.peak_ist.slice(-5)} के आसपास सबसे ज़्यादा होगा। कल सुबह की प्रार्थना सभा से पहले PM2.5 देखें; 90 से ऊपर हो तो सभा अंदर करें।`,
   pa: (t) => `${t.town} ਵੱਲ ਅੱਜ ਰਾਤ ਪਰਾਲੀ ਦਾ ਧੂੰਆਂ ਆ ਰਿਹਾ ਹੈ। ਇਹ ਲਗਭਗ ${t.arrives_ist.slice(-5)} ਵਜੇ ਪਹੁੰਚੇਗਾ ਅਤੇ ${t.peak_ist.slice(-5)} ਦੇ ਨੇੜੇ ਸਭ ਤੋਂ ਵੱਧ ਹੋਵੇਗਾ। ਕੱਲ੍ਹ ਸਵੇਰ ਦੀ ਸਭਾ ਤੋਂ ਪਹਿਲਾਂ PM2.5 ਵੇਖੋ; 90 ਤੋਂ ਵੱਧ ਹੋਵੇ ਤਾਂ ਸਭਾ ਅੰਦਰ ਕਰੋ।`,
 };
-const STATE_COLOURS = { "Punjab (India)": "#EE5A24", "Haryana": "#D6A93F", "Punjab (Pakistan)": "#B9A7D6", "Rajasthan": "#7FA87A", "Delhi": "#6F8FD8", "Uttar Pradesh": "#C77DA8", "Himachal Pradesh": "#8AB8C7" };
-function originHTML(t) {  // where this town's farm smoke comes from tonight (exact split within the smoke model)
-  if (!t.from_states || !t.from_states.length) return "";
-  const col = (n) => STATE_COLOURS[n] || "#8E8A85";
-  return `<div class="origin"><h4>Where tonight's farm smoke here comes from</h4>
-    <div class="obar">${t.from_states.map(s => `<span style="width:${s.share * 100}%;background:${col(s.name)}" title="${s.name} ${Math.round(s.share * 100)}%"></span>`).join("")}</div>
-    <div class="okey">${t.from_states.map(s => `<span><i style="background:${col(s.name)}"></i>${s.name} ${Math.round(s.share * 100)}%</span>`).join("")}</div>
-    <ol>${t.from_areas.slice(0, 3).map(a => `<li>Fires ${a.name}: ${Math.round(a.share * 100)}%</li>`).join("")}</ol></div>`;
+const STATE_COL = { "Punjab (India)": "#F28A3B", Haryana: "#F6C453", "Punjab (Pakistan)": "#C79BE0", Rajasthan: "#7FC6A4", Delhi: "#8FD6EA", "Uttar Pradesh": "#E08AA8", "Himachal Pradesh": "#9DB7C9" };
+function arc(a, b) { // a gentle curve bowed to one side, like drifting smoke
+  const dx = b[0] - a[0], dy = b[1] - a[1], m = [(a[0] + b[0]) / 2 - dy * 0.2, (a[1] + b[1]) / 2 + dx * 0.2], out = [];
+  for (let i = 0; i <= 40; i++) { const t = i / 40, u = 1 - t; out.push([u * u * a[0] + 2 * u * t * m[0] + t * t * b[0], u * u * a[1] + 2 * u * t * m[1] + t * t * b[1]]); }
+  return out;
 }
-function renderNotice() {
-  const t = S.town && S.d.towns.find(t => t.town === S.town);
-  if (!t) { $("#notice").innerHTML = ""; return; }
-  const lv = level(t.peak_ugm3);
-  if (lv === "low") { $("#notice").innerHTML = `<div class="notice" style="border-left-color:var(--muted)"><h3>${t.town}: little farm smoke expected</h3><p>Predicted farm-fire smoke stays under 10 µg/m³ of PM2.5. Other pollution sources still apply.</p></div>`; return; }
-  $("#notice").innerHTML = `<div class="notice" style="border-left-color:var(--${lv})"><h3>${t.town}: ${lv === "alert" ? "heavy farm smoke heading here tonight" : "farm smoke expected tonight"}</h3>
-    <div class="langs">${["en", "hi", "pa"].map(l => `<button type="button" data-l="${l}" aria-pressed="${S.lang === l}">${{ en: "English", hi: "हिन्दी", pa: "ਪੰਜਾਬੀ" }[l]}</button>`).join("")}</div>
+function selectTown(name, fly) {
+  const t = S.d.towns.find((x) => x.town === name); if (!t) return;
+  S.town = name; buildTowns(); renderTownCard();
+  const [la, lo] = TOWNS[name], src = (t.from_fires || []).slice(0, 6);
+  map.getSource("arcs")?.setData(geo(src.map((s) => ({ type: "Feature", properties: { share: s.share }, geometry: { type: "LineString", coordinates: arc([s.lon, s.lat], [lo, la]) } }))));
+  map.getSource("origins")?.setData(geo(src.map((s) => pt(s.lon, s.lat, { share: s.share }))));
+  const k = S.frames.findIndex((_, i) => fmtIST(frameTime(i)) === (t.peak_ist || "").slice(-5)); if (k >= 0) S.t = k;
+  if (!fly) return;
+  if (src.length) {
+    const b = new maplibregl.LngLatBounds([lo, la], [lo, la]); src.forEach((s) => b.extend([s.lon, s.lat]));
+    const brg = Math.atan2(lo - src[0].lon, la - src[0].lat) * 180 / Math.PI;
+    map.fitBounds(b, { padding: 70, pitch: 58, bearing: brg, maxZoom: 9.4, duration: 2400 });
+  } else map.flyTo({ center: [lo, la], zoom: 9, pitch: 50, duration: 1800 });
+}
+function renderTownCard() {
+  const t = S.d.towns.find((x) => x.town === S.town); if (!t) { $("#towncard").innerHTML = ""; return; }
+  const lv = level(t.peak_ugm3), src = t.from_fires || [];
+  const origin = t.from_states?.length ? `<div class="fine" style="margin-top:10px">Where tonight's smoke here comes from</div>
+    <div class="obar">${t.from_states.map((s, i) => `<span style="width:${s.share * 100}%;background:${STATE_COL[s.name] || "#6F8897"};animation-delay:${i * 90}ms" title="${esc(s.name)} ${Math.round(s.share * 100)}%"></span>`).join("")}</div>
+    <div class="okey">${t.from_states.map((s) => `<span><i style="background:${STATE_COL[s.name] || "#6F8897"}"></i>${esc(s.name)} ${Math.round(s.share * 100)}%</span>`).join("")}</div>` : "";
+  $("#towncard").innerHTML = lv === "low" ? `<div class="card"><h3>${esc(t.town)}: little farm smoke tonight</h3><p>Modelled farm-fire smoke stays under 10 µg/m³ of PM2.5. Other pollution sources still apply.</p>${origin}</div>` :
+    `<div class="card"><h3>${esc(t.town)}: ${lv === "alert" ? "heavy farm smoke heading here tonight" : "farm smoke expected tonight"}</h3>
+    <div class="seg" role="group" aria-label="Language">${["en", "hi", "pa"].map((l) => `<button type="button" data-l="${l}" aria-pressed="${S.lang === l}">${{ en: "English", hi: "हिन्दी", pa: "ਪੰਜਾਬੀ" }[l]}</button>`).join("")}</div>
     <p class="msg" lang="${S.lang}">${MSG[S.lang](t)}</p>
-    <p class="more">Farm smoke adds up to ~${t.peak_ugm3.toFixed(0)} µg/m³ PM2.5 at its peak (model estimate) · alerts go out above 25</p>
-    ${t.members ? `<p class="more">Confidence: in ${Math.round(t.p_alert * t.members)} of ${t.members} weather scenarios it tops 25 µg/m³, in ${Math.round(t.p_watch * t.members)} it tops 10${t.arrive_window && t.arrive_window.length ? `; arrival between ${t.arrive_window[0].slice(-5)} and ${t.arrive_window[1].slice(-5)}` : ""}.</p>` : ""}
-    ${originHTML(t)}</div>`;
-  $("#notice").querySelectorAll(".langs button").forEach(b => b.addEventListener("click", () => { S.lang = b.dataset.l; renderNotice(); }));
+    <p class="fine">Adds ~${Math.round(t.peak_ugm3)} µg/m³ of PM2.5 at its peak (model)${t.members ? ` · tops 25 in ${Math.round(t.p_alert * t.members)} of ${t.members} weather scenarios${t.arrive_window?.length ? ` · arrives ${t.arrive_window[0].slice(-5)}–${t.arrive_window[1].slice(-5)}` : ""}` : ""}</p>
+    ${origin}
+    <div class="act">${src.length ? `<button class="btn primary" type="button" id="toorigin">Fly to where it starts</button>` : ""}<button class="btn" type="button" id="totown">Fly to ${esc(t.town)}</button></div></div>`;
+  $("#towncard").querySelectorAll(".seg button").forEach((b) => b.addEventListener("click", () => { S.lang = b.dataset.l; renderTownCard(); }));
+  $("#toorigin")?.addEventListener("click", () => {
+    const s = src[0]; pulseAt(s.lon, s.lat);
+    map.flyTo({ center: [s.lon, s.lat], zoom: 11.3, pitch: 66, bearing: map.getBearing() + 25, duration: 2800, curve: 1.5 });
+    toast(`${Math.round(s.share * 100)}% of ${t.town}'s farm smoke tonight comes from ${s.source === "VIIRS" ? "fires counted at the 13:30 pass" : `a fire first seen at ${s.first_ist}`} near ${s.near}, ${s.state}.`);
+  });
+  $("#totown")?.addEventListener("click", () => map.flyTo({ center: [TOWNS[t.town][1], TOWNS[t.town][0]], zoom: 10.5, pitch: 55, duration: 2000 }));
 }
+$("#q").addEventListener("change", (e) => { const n = Object.keys(TOWNS).find((t) => t.toLowerCase() === e.target.value.trim().toLowerCase()); if (n) { selectTab("towns"); selectTown(n, true); e.target.blur(); } else if (e.target.value) toast("That town isn't in Saanjh's list yet."); });
 
-/* ---------- officers ---------- */
+/* ---------- fires ---------- */
 function buildFires() {
-  const tot = S.d.stats.harm_total, rows = S.d.fires.slice(0, S.showAll ? 50 : 20);
-  $("#fires").innerHTML = rows.map((f, i) => `<tr data-i="${i}" aria-selected="${S.fire === i}" tabindex="0">
-      <td>${i + 1}</td><td>${f.near}</td><td>${f.source === "VIIRS" ? "by 13:30" : f.first_ist}</td><td class="num">${(f.harm / tot * 100).toFixed(1)}%</td>
-      <td><span class="rec ${f.counted ? "counted" : "missed"}">${f.counted ? "Counted" : "Missed"}</span></td></tr>`).join("");
-  $("#fires").querySelectorAll("tr").forEach(r => { r.addEventListener("click", () => selectFire(+r.dataset.i)); r.addEventListener("keydown", (e) => e.key === "Enter" && selectFire(+r.dataset.i)); });
-  $("#morefires").textContent = S.showAll ? "Show top 20" : "Show all 50";
+  const tot = S.d.stats.harm_total, rows = S.d.fires.slice(0, S.showAll ? 50 : 15);
+  $("#fires").innerHTML = rows.map((f, i) => `<li style="--i:${i}"><button class="row firerow" type="button" data-i="${i}" aria-pressed="${S.fire === i}">
+    <span class="rank">${i + 1}</span><span class="t"><i class="heat" style="background:${fireColor(f.frp_peak)};box-shadow:0 0 10px ${fireColor(f.frp_peak)}"></i>${esc(f.near)}<span class="tag ${f.counted ? "counted" : "missed"}">${f.counted ? "COUNTED" : "MISSED"}</span></span>
+    <span class="share">${(f.harm / tot * 100).toFixed(1)}%</span>
+    <span class="s">${f.source === "VIIRS" ? "seen at the 13:30 pass" : `first seen ${f.first_ist} · ${Math.round(f.frp_peak)} MW peak`}</span></button></li>`).join("");
+  $("#fires").querySelectorAll(".row").forEach((b) => b.addEventListener("click", () => selectFire(+b.dataset.i, true)));
+  $("#morefires").textContent = S.showAll ? "Show top 15" : "Show all 50";
 }
 $("#morefires").addEventListener("click", () => { S.showAll = !S.showAll; buildFires(); });
-function sparkline(f) {  // fire power every 10 minutes, 12:00-22:00 IST, with the polar-satellite pass marked
-  if (!f.curve || !f.curve.length) return "";
-  const W = 320, H = 70, x = (m) => 20 + m / 600 * (W - 40), mx = Math.max(...f.curve.map(p => p[1]), 1), y = (v) => H - 16 - v / mx * (H - 26);
-  const pts = f.curve.map(([m, v]) => `${x(m)},${y(v)}`).join(" ");
-  return `<svg viewBox="0 0 ${W} ${H}" class="spark" role="img" aria-label="Fire power seen every 10 minutes">
-    <line x1="${x(90)}" x2="${x(90)}" y1="4" y2="${H - 16}" stroke="var(--official)" stroke-dasharray="3 3"/>
-    <text x="${x(90) + 4}" y="12">satellite pass</text>
-    <polyline points="${pts}" fill="none" stroke="var(--c-ember)" stroke-width="2"/>
-    ${f.curve.map(([m, v]) => `<circle cx="${x(m)}" cy="${y(v)}" r="2.5" fill="var(--c-ember)"><title>${String(12 + Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")} IST · ${v} MW</title></circle>`).join("")}
-    ${[0, 120, 240, 360, 480, 600].map(m => `<text x="${x(m)}" y="${H - 3}" text-anchor="middle">${12 + m / 60}:00</text>`).join("")}
-  </svg><div class="sparkcap">Fire power seen by GK-2A every 10 minutes (peak ${Math.round(mx)} MW)</div>`;
-}
-function selectFire(i) {
+function pulseAt(lon, lat) { map.getSource("pulse")?.setData(geo([pt(lon, lat, {})])); }
+function selectFire(i, fly) {
+  if (S.fire != null && map.getSource("fires")) map.setFeatureState({ source: "fires", id: S.fire }, { sel: false });
   S.fire = i; const f = S.d.fires[i], tot = S.d.stats.harm_total;
-  const k = Math.round((firstSeenMs(f) - frameTime(0)) / 3600e3) + 6; if (k >= 0) S.frame = Math.min(k, S.frames.length - 1);
-  buildFires(); draw();
-  const seen = f.source === "VIIRS"
-    ? `seen by the polar satellites at their ~13:30 pass (fire power ${Math.round(f.frp_peak)} MW), estimated to release about ${Math.round(f.pm25_kg)} kg of PM2.5 over the day`
-    : `first seen by GK-2A at ${f.first_ist} and seen in ${f.scans} image${f.scans > 1 ? "s" : ""}, releasing about ${Math.round(f.pm25_kg)} kg of PM2.5`;
-  $("#why").innerHTML = `<div class="why"><b>Why #${i + 1}:</b> near ${f.near}, ${seen}.
-    ${f.counted ? "It is in the official count." : "<b>It started after the polar satellites passed, so the official count missed it.</b>"}
-    Its smoke drifts into populated areas under tonight's shallow air layer, giving it ${(f.harm / tot * 100).toFixed(1)}% of all people-hours of farm smoke from today's fires.
-    ${sparkline(f)}
-    <br><button type="button" id="askwhy">Ask Saanjh why</button></div>`;
+  if (map.getSource("fires")) map.setFeatureState({ source: "fires", id: i }, { sel: true });
+  buildFires(); pulseAt(f.lon, f.lat);
+  if (fly) map.flyTo({ center: [f.lon, f.lat], zoom: 11, pitch: 62, bearing: map.getBearing() - 18, duration: 2300, curve: 1.4 });
+  const seen = f.source === "VIIRS" ? `counted by the polar satellites at their ~13:30 pass (${Math.round(f.frp_peak)} MW)` : `first seen by GK-2A at <b>${f.first_ist}</b>, burning through ${f.scans} ten-minute image${f.scans > 1 ? "s" : ""}, peak <b>${Math.round(f.frp_peak)} MW</b>`;
+  $("#firecard").innerHTML = `<div class="card"><h3>#${i + 1} · near ${esc(f.near)}</h3>
+    <p>${seen}; about <b>${Math.round(f.pm25_kg)} kg</b> of PM2.5. ${f.counted ? "It is in the official count." : "<b style='color:#FFB38A'>It started after the satellites passed, so the official count missed it.</b>"} Its smoke accounts for <b>${(f.harm / tot * 100).toFixed(1)}%</b> of the people-hours of farm smoke tonight.</p>
+    ${sparkline(f)}<div class="act"><button class="btn primary" type="button" id="askwhy">Ask Saanjh why</button></div></div>`;
   $("#askwhy").addEventListener("click", () => ask({ rank: i + 1 }));
+  $("#firecard").scrollIntoView({ block: "nearest", behavior: reduceMotion ? "auto" : "smooth" });
+}
+function sparkline(f) {
+  if (!f.curve || !f.curve.length) return "";
+  const W = 340, H = 76, x = (m) => 20 + m / 600 * (W - 40), mx = Math.max(...f.curve.map((p) => p[1]), 1), y = (v) => H - 18 - v / mx * (H - 32);
+  const area = `M${x(f.curve[0][0])},${H - 18} ` + f.curve.map(([m, v]) => `L${x(m)},${y(v)}`).join(" ") + ` L${x(f.curve[f.curve.length - 1][0])},${H - 18}Z`;
+  return `<svg class="spark" viewBox="0 0 ${W} ${H}" role="img" aria-label="Fire power every 10 minutes">
+    <defs><linearGradient id="sg" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#F28A3B" stop-opacity=".55"/><stop offset="1" stop-color="#F28A3B" stop-opacity="0"/></linearGradient></defs>
+    <line x1="${x(90)}" x2="${x(90)}" y1="4" y2="${H - 18}" stroke="#8FD6EA" stroke-dasharray="3 3"/><text x="${x(90) + 4}" y="12">satellite pass 13:30</text>
+    <path d="${area}" fill="url(#sg)"/><polyline points="${f.curve.map(([m, v]) => `${x(m)},${y(v)}`).join(" ")}" fill="none" stroke="#F28A3B" stroke-width="2"/>
+    ${[0, 120, 240, 360, 480, 600].map((m) => `<text x="${x(m)}" y="${H - 4}" text-anchor="middle">${12 + m / 60}:00</text>`).join("")}</svg>
+    <div class="fine">Fire power seen by GK-2A every 10 minutes · peak ${Math.round(mx)} MW</div>`;
 }
 
 /* ---------- assistant (Strands agent on Amazon Bedrock) ---------- */
 let AGENT = null;
-fetch("config.json").then(r => r.json()).then(c => { AGENT = c.agent_url || null; }).catch(() => {});
+fetch("config.json").then((r) => r.json()).then((c) => { AGENT = c.agent_url || null; }).catch(() => {});
 async function ask(params) {
   const out = $("#answer");
-  if (!AGENT) { out.textContent = "The assistant isn't available on this copy of the page."; return; }
-  out.textContent = "Thinking…";
-  const qs = new URLSearchParams(params);
-  if (S.d.replay) qs.set("day", S.d.day);
-  try {
-    const r = await fetch(AGENT + "?" + qs.toString()), j = await r.json();
-    out.textContent = j.answer || j.error || "No answer came back. Try again in a minute.";
-  } catch { out.textContent = "Couldn't reach the assistant. Check your connection and try again."; }
-  out.scrollIntoView({ block: "nearest" });
+  if (S.tab !== "fires") selectTab("fires");
+  if (!AGENT) { out.className = "answer"; out.textContent = "The assistant isn't available on this copy of the page."; return; }
+  out.className = "answer loading"; out.textContent = "Thinking";
+  const p = new URLSearchParams(params); if (S.d.replay) p.set("day", S.d.day);
+  try { const j = await (await fetch(AGENT + "?" + p)).json(); out.className = "answer"; out.textContent = j.answer || j.error || "No answer came back. Try again in a minute."; }
+  catch { out.className = "answer"; out.textContent = "Couldn't reach the assistant. Check your connection and try again."; }
+  out.scrollIntoView({ block: "nearest", behavior: reduceMotion ? "auto" : "smooth" });
 }
 $("#askform").addEventListener("submit", (e) => { e.preventDefault(); const q = $("#askq").value.trim(); if (q) ask({ q }); });
 
-/* ---------- send teams before dusk (noon plan) ---------- */
-let PLAN = null;
-fetch("plan.json" + location.search).then(r => r.ok ? r.json() : null).then(p => { PLAN = p; renderPlan(); }).catch(() => {});
-function planGreedy(score, ny, nx, k) {  // maximum coverage with 3x3 blocks; mirrors saanjh/risk.py plan()
+/* ---------- send teams (noon plan) ---------- */
+function planGreedy(score, ny, nx, k) { // maximum coverage with 3x3 blocks; mirrors saanjh/risk.py plan()
   const s = Float64Array.from(score), picks = [];
   for (let t = 0; t < k; t++) {
     let best = -1, br = 0, bc = 0;
-    for (let r = 0; r < ny; r++) for (let c = 0; c < nx; c++) {
-      let g = 0;
-      for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
-        const rr = r + dr, cc = c + dc; if (rr >= 0 && rr < ny && cc >= 0 && cc < nx) g += s[rr * nx + cc];
-      }
-      if (g > best) { best = g; br = r; bc = c; }
-    }
-    if (best <= 0) break;
-    picks.push([br, bc, best]);
-    for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
-      const rr = br + dr, cc = bc + dc; if (rr >= 0 && rr < ny && cc >= 0 && cc < nx) s[rr * nx + cc] = 0;
-    }
+    for (let r = 0; r < ny; r++) for (let c = 0; c < nx; c++) { let g = 0; for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) { const rr = r + dr, cc = c + dc; if (rr >= 0 && rr < ny && cc >= 0 && cc < nx) g += s[rr * nx + cc]; } if (g > best) { best = g; br = r; bc = c; } }
+    if (best <= 0) break; picks.push([br, bc, best]);
+    for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) { const rr = br + dr, cc = bc + dc; if (rr >= 0 && rr < ny && cc >= 0 && cc < nx) s[rr * nx + cc] = 0; }
   }
   return picks;
 }
-function renderPlan() {
+function renderPlan(first) {
   const k = +$("#teams").value; $("#teamsn").textContent = k;
-  if (!PLAN) { $("#planstat").textContent = "No plan for this day yet. Plans are made at 11:30 IST; replays exist for the 2025 test season (try ?day=2025-11-10)."; $("#teamlist").innerHTML = ""; return; }
-  const g = PLAN.grid, eh = PLAN.expected_harm, tot = eh.reduce((a, b) => a + b, 0);
-  S.planPicks = planGreedy(eh, g.ny, g.nx, k);
-  const share = S.planPicks.reduce((a, p) => a + p[2], 0) / tot;
-  let line = `These <b>${k}</b> teams cover <b>${Math.round(share * 100)}%</b> of tonight's expected farm-smoke harm.`;
-  if (PLAN.actual_energy) {
-    const act = PLAN.actual_energy.map(v => Math.expm1(v / 100)), atot = act.reduce((a, b) => a + b, 0);
-    const cov = new Set(); for (const [r, c] of S.planPicks) for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) cov.add((r + dr) * g.nx + c + dc);
-    let hit = 0; cov.forEach(i => { if (i >= 0 && i < act.length) hit += act[i]; });
-    line += ` That evening, their blocks held <b>${Math.round(hit / atot * 100)}%</b> of the fire energy GK-2A actually saw.`;
+  if (!S.plan) { $("#planstat").innerHTML = "No plan for this night. Plans are made at 11:30 IST; nights marked “with plan” in the picker show the 2025 test season."; $("#teamlist").innerHTML = ""; $("#planmeter").style.width = "0"; return; }
+  const g = S.plan.grid, eh = S.plan.expected_harm, tot = eh.reduce((a, b) => a + b, 0), picks = planGreedy(eh, g.ny, g.nx, k), share = picks.reduce((a, p) => a + p[2], 0) / tot;
+  let line = `These <b style="color:var(--ink)">${k}</b> teams cover <b style="color:var(--ink)">${Math.round(share * 100)}%</b> of tonight's expected farm-smoke harm.`;
+  if (S.plan.actual_energy) {
+    const act = S.plan.actual_energy.map((v) => Math.expm1(v / 100)), atot = act.reduce((a, b) => a + b, 0), cov = new Set();
+    for (const [r, c] of picks) for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) cov.add((r + dr) * g.nx + c + dc);
+    let hit = 0; cov.forEach((i) => { if (i >= 0 && i < act.length) hit += act[i]; });
+    line += ` That evening their blocks held <b style="color:var(--ink)">${Math.round(hit / atot * 100)}%</b> of the fire energy GK-2A actually saw (white dots).`;
   }
-  $("#planstat").innerHTML = line;
-  $("#teamlist").innerHTML = S.planPicks.map(([r, c, gain]) => {
-    const la = g.lat0 + (r + .5) * g.d, lo = g.lon0 + (c + .5) * g.d;
-    const [name, [tla, tlo]] = Object.entries(TOWNS).reduce((b, e) => ((e[1][0] - la) ** 2 + (e[1][1] - lo) ** 2 < (b[1][0] - la) ** 2 + (b[1][1] - lo) ** 2 ? e : b));
-    const km = Math.hypot((tla - la) * 111, (tlo - lo) * 96);
-    return `<li>Around ${km < 6 ? name : `${Math.round(km)} km from ${name}`}<span>${(gain / tot * 100).toFixed(1)}%</span></li>`;
-  }).join("");
-  if (S.tab === "plan") draw();
+  $("#planstat").innerHTML = line; $("#planmeter").style.width = `${Math.round(share * 100)}%`;
+  $("#teamlist").innerHTML = picks.map(([r, c, gain]) => { const la = g.lat0 + (r + 0.5) * g.d, lo = g.lon0 + (c + 0.5) * g.d; const [n, [tl, tn]] = Object.entries(TOWNS).reduce((b, e) => ((e[1][0] - la) ** 2 + (e[1][1] - lo) ** 2 < (b[1][0] - la) ** 2 + (b[1][1] - lo) ** 2 ? e : b)); const km = Math.hypot((tl - la) * 111, (tn - lo) * 96); return `<li>${km < 6 ? `Around ${esc(n)}` : `${Math.round(km)} km from ${esc(n)}`}<span>${(gain / tot * 100).toFixed(1)}%</span></li>`; }).join("");
+  if (!map.getSource("risk")) return;
+  const poly = (r, c, n) => [[g.lon0 + c * g.d, g.lat0 + r * g.d], [g.lon0 + (c + n) * g.d, g.lat0 + r * g.d], [g.lon0 + (c + n) * g.d, g.lat0 + (r + n) * g.d], [g.lon0 + c * g.d, g.lat0 + (r + n) * g.d], [g.lon0 + c * g.d, g.lat0 + r * g.d]];
+  if (first || !S.riskSet) {
+    // cells under ~1.5% of tonight's peak stay flat: less noise
+    const fs = []; eh.forEach((v, i) => { if (v > 15) { const r = Math.floor(i / g.nx), c = i % g.nx; fs.push({ type: "Feature", properties: { v: v / 1000 }, geometry: { type: "Polygon", coordinates: [poly(r + 0.12, c + 0.12, 0.76)] } }); } });
+    map.getSource("risk").setData(geo(fs)); S.riskSet = true;
+    if (S.plan.actual_energy) map.getSource("actual").setData(geo(S.plan.actual_energy.map((v, i) => (v > 0 ? pt(g.lon0 + (i % g.nx + 0.5) * g.d, g.lat0 + (Math.floor(i / g.nx) + 0.5) * g.d, {}) : null)).filter(Boolean)));
+  }
+  map.getSource("blocks").setData(geo(picks.flatMap(([r, c], i) => [{ type: "Feature", properties: { n: String(i + 1) }, geometry: { type: "LineString", coordinates: poly(r - 1, c - 1, 3) } }, pt(g.lon0 + (c + 0.5) * g.d, g.lat0 + (r + 2.2) * g.d, { n: String(i + 1) })])));
 }
-function drawPlan() {
-  if (!PLAN) return;
-  const g = PLAN.grid;
-  for (let r = 0; r < g.ny; r++) for (let c = 0; c < g.nx; c++) {
-    const v = PLAN.expected_harm[r * g.nx + c] / 1000; if (v <= 0.002) continue;
-    ctx.fillStyle = `rgba(238,90,36,${Math.min(.9, .18 + Math.sqrt(v) * 1.1)})`;
-    const x0 = px(g.lon0 + c * g.d), y0 = py(g.lat0 + (r + 1) * g.d);
-    ctx.fillRect(x0, y0, px(g.lon0 + (c + 1) * g.d) - x0, py(g.lat0 + r * g.d) - y0);
-  }
-  if (PLAN.actual_energy) {
-    ctx.fillStyle = "rgba(255,255,255,.75)";
-    for (let r = 0; r < g.ny; r++) for (let c = 0; c < g.nx; c++) {
-      const v = PLAN.actual_energy[r * g.nx + c]; if (v <= 0) continue;
-      ctx.beginPath(); ctx.arc(px(g.lon0 + (c + .5) * g.d), py(g.lat0 + (r + .5) * g.d), 0.8 + v / 900, 0, 7); ctx.fill();
-    }
-  }
-  ctx.lineWidth = 2; ctx.font = "700 12px 'Spline Sans Mono', monospace";
-  (S.planPicks || []).forEach(([r, c], i) => {
-    const x0 = px(g.lon0 + (c - 1) * g.d), y0 = py(g.lat0 + (r + 2) * g.d), x1 = px(g.lon0 + (c + 2) * g.d), y1 = py(g.lat0 + (r - 1) * g.d);
-    ctx.strokeStyle = "#B9A7D6"; ctx.strokeRect(x0, y0, x1 - x0, y1 - y0);
-    ctx.fillStyle = "#fff"; ctx.fillText(String(i + 1), x0 + 3, y0 + 13);
-  });
+$("#teams").addEventListener("input", () => renderPlan());
+
+/* ---------- the horizon timeline ---------- */
+function buildHorizon() {
+  const svg = $("#hsvg"), W = svg.clientWidth || 800, H = svg.clientHeight || 84, n = S.frames.length;
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  const xk = (k) => k / (n - 1) * W, t0 = frameTime(0), base = H - 22;
+  let stops = ""; for (let k = 0; k < n; k++) { const h = ((frameTime(k) + IST) / 3600e3) % 24, hh = h < 9 ? h + 24 : h; stops += `<stop offset="${(k / (n - 1)).toFixed(3)}" stop-color="${skyAt(hh)[1]}"/>`; }
+  const hist = S.d.stats.first_seen || {}, ridge = new Array(n).fill(0);
+  for (const [hm, c] of Object.entries(hist)) { const [h, m] = hm.split(":").map(Number), k = (Date.parse(S.d.day + "T00:00Z") + (h * 60 + m) * 60e3 - IST - t0) / 3600e3; if (k >= 0 && k < n) ridge[Math.round(k)] += c; }
+  const rmax = Math.max(1, ...ridge), pts = ridge.map((c, k) => `${xk(k).toFixed(1)},${(base - 4 - c / rmax * (base - 22)).toFixed(1)}`);
+  const pass = (Date.parse(S.d.day + "T08:00Z") - t0) / 3600e3;
+  const every = [1, 2, 3, 6, 12].find((e) => (W / (n - 1)) * e >= 54) || 12; // keep hour labels from colliding
+  let ticks = ""; for (let k = 0; k < n; k += every) ticks += `<text x="${xk(k) + 3}" y="${H - 7}">${fmtIST(frameTime(k))}</text>`;
+  svg.innerHTML = `<defs><linearGradient id="skyg">${stops}</linearGradient><linearGradient id="ridgeg" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#FFD08A" stop-opacity=".95"/><stop offset="1" stop-color="#D9492E" stop-opacity=".2"/></linearGradient></defs>
+    <rect x="0" y="0" width="${W}" height="${base}" fill="url(#skyg)" opacity=".5"/>
+    <path d="M0,${base} L${pts.join(" L")} L${W},${base} Z" fill="url(#ridgeg)"/>
+    <line x1="0" x2="${W}" y1="${base}" y2="${base}" stroke="rgba(150,196,222,.3)"/>
+    ${pass >= 0 && pass < n ? `<line x1="${xk(pass)}" x2="${xk(pass)}" y1="4" y2="${base}" stroke="#8FD6EA" stroke-width="1.5" stroke-dasharray="3 3"/><text x="${xk(pass) + 5}" y="14" style="fill:#BFE7F2">satellites pass</text>` : ""}
+    ${W > 760 ? `<text x="${W - 6}" y="14" text-anchor="end">ridge: fires first seen each hour</text>` : ""}
+    ${ticks}<g id="ph"><line y1="0" y2="${base}" stroke="#fff" stroke-width="2"/><circle r="5" cy="${base}" fill="#fff"/></g>`;
+  S.hW = W;
 }
-$("#teams").addEventListener("input", renderPlan);
+const setT = (t) => { S.t = Math.max(0, Math.min(S.frames.length - 1, t)); };
+function scrub(e) { const r = $("#horizon").getBoundingClientRect(); setT((e.clientX - r.left) / r.width * (S.frames.length - 1)); }
+$("#horizon").addEventListener("pointerdown", (e) => { stop(); $("#horizon").setPointerCapture(e.pointerId); scrub(e); });
+$("#horizon").addEventListener("pointermove", (e) => { if (e.buttons) scrub(e); });
+$("#horizon").addEventListener("keydown", (e) => { if (e.key === "ArrowRight") setT(Math.floor(S.t) + 1); if (e.key === "ArrowLeft") setT(Math.ceil(S.t) - 1); if (e.key === " ") { e.preventDefault(); $("#play").click(); } });
+function stop() { S.playing = false; $("#playlbl").textContent = "Play"; $("#playicon").innerHTML = `<path d="M8 5v14l11-7z"/>`; }
+$("#play").addEventListener("click", () => {
+  if (S.playing) return stop();
+  if (S.t >= S.frames.length - 1.01) S.t = 0;
+  S.playing = true; $("#playlbl").textContent = "Pause"; $("#playicon").innerHTML = `<path d="M7 5h4v14H7zM13 5h4v14h-4z"/>`;
+});
+addEventListener("resize", () => { if (S.d) buildHorizon(); map.setPadding(padding()); });
+
+/* ---------- animation loop: smoke, sky, clock, arcs, pulse ---------- */
+let last = performance.now(), lastDrawnT = -1, lastSkyH = -99, dashStep = -1;
+const DASH = [[0, 4, 3], [0.5, 4, 2.5], [1, 4, 2], [1.5, 4, 1.5], [2, 4, 1], [2.5, 4, 0.5], [3, 4, 0], [0, 0.5, 3, 3.5], [0, 1, 3, 3], [0, 1.5, 3, 2.5], [0, 2, 3, 2], [0, 2.5, 3, 1.5], [0, 3, 3, 1], [0, 3.5, 3, 0.5]];
+function applySky(force) {
+  const h = ((frameTime(0) + S.t * 3600e3 + IST) / 3600e3) % 24, hh = h < 9 ? h + 24 : h;
+  if (!force && Math.abs(hh - lastSkyH) < 0.05) return; lastSkyH = hh;
+  const [sky, horizon, fog] = skyAt(hh);
+  try { map.setSky({ "sky-color": sky, "horizon-color": horizon, "fog-color": fog, "sky-horizon-blend": 0.6, "horizon-fog-blend": 0.35, "fog-ground-blend": 0.18, "atmosphere-blend": ["interpolate", ["linear"], ["zoom"], 4, 1, 9, 0.55, 12, 0.15] }); } catch (e) {}
+}
+function tick(now) {
+  const dt = Math.min(0.1, (now - last) / 1000); last = now;
+  if (S.playing && S.frames.length) { S.t += dt * (reduceMotion ? 0.6 : 1.3); if (S.t >= S.frames.length - 1) { S.t = S.frames.length - 1; stop(); } }
+  if (S.frames.length && Math.abs(S.t - lastDrawnT) > 0.004) {
+    drawSmoke(); applySky(); lastDrawnT = S.t;
+    const ms = frameTime(0) + S.t * 3600e3; $("#clock").textContent = fmtIST(ms); $("#clockd").textContent = dayIST(ms) + " · IST";
+    $("#ph")?.setAttribute("transform", `translate(${(S.t / (S.frames.length - 1) * (S.hW || 0)).toFixed(1)},0)`);
+    $("#horizon").setAttribute("aria-valuetext", fmtIST(ms) + " IST");
+  }
+  if (!reduceMotion && map.getLayer("arcs")) { const s = Math.floor(now / 65) % DASH.length; if (s !== dashStep) { dashStep = s; map.setPaintProperty("arcs", "line-dasharray", DASH[s]); } }
+  if (map.getLayer("pulse")) { const p = (now % 1700) / 1700; map.setPaintProperty("pulse", "circle-radius", 8 + p * 28); map.setPaintProperty("pulse", "circle-stroke-opacity", 0.9 * (1 - p)); }
+  requestAnimationFrame(tick);
+}
+
+/* ---------- controls ---------- */
+$("#zin").addEventListener("click", () => map.zoomIn());
+$("#zout").addEventListener("click", () => map.zoomOut());
+$("#bnorth").addEventListener("click", () => map.flyTo({ ...HOME, duration: 1700 }));
+$("#b3d").addEventListener("click", () => {
+  S.is3d = !S.is3d; $("#b3d").setAttribute("aria-pressed", S.is3d); $("#b3dt").textContent = S.is3d ? "3D" : "2D";
+  map.easeTo({ pitch: S.is3d ? 55 : 0, bearing: S.is3d ? -14 : 0, duration: 1000 });
+  map.setTerrain(S.is3d && layerOn.terrain ? { source: "dem", exaggeration: 2.2 } : null);
+});
+$("#blayers").addEventListener("click", () => { const o = $("#layers").classList.toggle("open"); $("#blayers").setAttribute("aria-expanded", o); });
+$("#layers").addEventListener("change", (e) => {
+  const l = e.target.dataset.l; layerOn[l] = e.target.checked;
+  if (l === "terrain") map.setTerrain(layerOn.terrain && S.is3d ? { source: "dem", exaggeration: 2.2 } : null); else syncLayers();
+});
+function renderLegend() {
+  $("#legend").innerHTML = S.tab === "teams"
+    ? `<div class="lr"><span class="col"></span>expected smoke harm tonight</div><div class="lr"><span class="ring" style="border-radius:3px"></span>team patrol block (~33 km)</div><div class="lr"><span class="dot"></span>fires that actually burned</div>`
+    : `<div class="lr"><span class="ramp"></span>fire power (missed by the count)</div><div class="lr"><span class="ring"></span>already counted (zoom in)</div><div class="lr"><span class="haze"></span>farm smoke at ground level</div>`;
+}
 
 /* ---------- evidence ---------- */
-fetch("evidence.json").then(r => r.json()).then(renderEvidence).catch(() => {});
-const esc = (x) => String(x).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+$("#open-ev").addEventListener("click", () => { $("#sheet").classList.add("open"); if (!S.ev) getJSON("evidence.json").then((E) => { S.ev = E; renderEvidence(E); }).catch(() => ($("#ev-grid").innerHTML = "<p class='lede'>The evidence couldn't load. Try again in a moment.</p>")); $("#close-ev").focus(); });
+$("#close-ev").addEventListener("click", () => $("#sheet").classList.remove("open"));
+addEventListener("keydown", (e) => { if (e.key === "Escape") { $("#sheet").classList.remove("open"); $("#layers").classList.remove("open"); } });
 const pct = (x) => `${Math.round(x * 100)}%`;
-function table(head, rows) {
-  return `<details><summary>Show the numbers</summary><table><thead><tr>${head.map(h => `<th>${esc(h)}</th>`).join("")}</tr></thead><tbody>${rows.map(r => `<tr>${r.map(c => `<td>${esc(c)}</td>`).join("")}</tr>`).join("")}</tbody></table></details>`;
-}
-function card(title, body, cap, extra = "", cls = "") {
-  return `<article class="ev ${cls}"><h3>${title}</h3>${body}<p class="cap">${cap}</p>${extra}</article>`;
-}
+function table(head, rows) { return `<details><summary>Show the numbers</summary><table><thead><tr>${head.map((h) => `<th>${esc(h)}</th>`).join("")}</tr></thead><tbody>${rows.map((r) => `<tr>${r.map((c) => `<td>${esc(c)}</td>`).join("")}</tr>`).join("")}</tbody></table></details>`; }
+function card(i, title, body, cap, extra = "", cls = "") { return `<article class="ev ${cls}" style="--i:${i}"><h3>${title}</h3>${body}<p class="cap">${cap}</p>${extra}</article>`; }
 function renderEvidence(E) {
-  const W = 460, cards = [];
-  // 1. season: daily fire energy, counted (bottom) vs missed (top)
-  {
-    const d = E.season.days, H = 170, pl = 34, pb = 22, max = Math.max(...d.map(x => x.missed_tj + x.counted_tj));
-    const bw = (W - pl) / d.length, y = (v) => (H - pb) - v / max * (H - pb - 6);
-    let g = `<line x1="${pl}" x2="${W}" y1="${H - pb}" y2="${H - pb}" stroke="var(--rule)"/>`;
-    [0, Math.round(max / 2), Math.round(max)].forEach(t => g += `<text x="${pl - 6}" y="${y(t) + 4}" text-anchor="end">${t}</text>`);
-    d.forEach((x, i) => {
-      const x0 = pl + i * bw + 1, w = Math.max(1, bw - 2), yc = y(x.counted_tj), ym = y(x.counted_tj + x.missed_tj);
-      g += `<g class="mark"><title>${x.day}: ${x.missed_tj} TJ missed, ${x.counted_tj} TJ counted</title>
-        <rect x="${x0}" y="${yc}" width="${w}" height="${H - pb - yc}" fill="var(--official)"/>
-        <rect x="${x0}" y="${ym}" width="${w}" height="${Math.max(0, yc - ym - 1)}" fill="var(--c-ember)" rx="1.5"/></g>`;
-      if (i % 10 === 0) g += `<text x="${x0}" y="${H - 6}">${x.day.slice(5)}</text>`;
-    });
-    cards.push(card(`<span class="big">${pct(E.season.missed_share)}</span><br>of the fire energy came after the satellites passed`,
-      `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Daily fire energy in 2025, mostly from fires the count missed">${g}</svg>
-       <div class="key"><span><i style="background:var(--c-ember)"></i>started after the overpass (missed)</span><span><i style="background:var(--official)"></i>burning at the overpass</span></div>`,
-      `Fire radiative energy GK-2A detected per day (TJ), Punjab + Haryana, 2025 (held out). 2024: ${pct(E.season.missed_share_2024)}.`,
-      table(["day", "missed TJ", "counted TJ"], E.season.days.map(x => [x.day, x.missed_tj, x.counted_tj]))));
-  }
-  // 2. dusk penalty: daily ratios as a dot strip, reference at 1x
-  {
-    const d = E.dusk["200"].days, H = 120, pl = 10, max = 6.5, x = (v) => pl + v / max * (W - pl - 10);
-    let g = `<line x1="${x(1)}" x2="${x(1)}" y1="10" y2="${H - 26}" stroke="var(--muted)" stroke-dasharray="3 3"/><text x="${x(1) + 4}" y="18">same harm</text>`;
-    [0, 1, 2, 3, 4, 5, 6].forEach(t => g += `<text x="${x(t)}" y="${H - 8}" text-anchor="middle">${t}×</text>`);
-    d.forEach((p, i) => g += `<circle class="mark" cx="${x(p.ratio)}" cy="${30 + (i % 7) * 9}" r="4.5" fill="var(--c-ember)" stroke="var(--panel)" stroke-width="2"><title>${p.day}: ${p.ratio}×</title></circle>`);
-    const pooled = E.dusk["200"].pooled;
-    g += `<line x1="${x(pooled)}" x2="${x(pooled)}" y1="8" y2="${H - 26}" stroke="var(--ink)" stroke-width="2"/><text class="val" x="${x(pooled) + 5}" y="18">${pooled}× overall</text>`;
-    cards.push(card(`The same fire lit at 5 pm does <span style="color:var(--c-ember)">${pooled}×</span> the harm of one at 1 pm`,
-      `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Exposure ratio, evening vs afternoon, every day above 1">${g}</svg>`,
-      `Population smoke exposure from identical emissions released at 17:00 vs 13:00 IST, each of 47 days of 2024 (ERA5 weather, WorldPop). After sunset the mixing layer collapses to tens of metres. With a 400 m plume floor: ${E.dusk["400"].pooled}×. Worse on every day.`,
-      table(["day", "ratio (200 m)"], d.map(p => [p.day, p.ratio]))));
-  }
-  // 3. planner: share of next-evening smoke harm covered by 20 teams
-  {
-    const rows = E.planner.filter(r => r.teams === 20 && r.method !== "saanjh: risk only").sort((a, b) => b.harm - a.harm);
-    const label = { "saanjh: expected harm": "Saanjh noon plan", "yesterday's GK-2A fires": "Yesterday's GK-2A fires", "last season's hotspots": "Last season's hotspots", "chase yesterday's VIIRS fires": "Chase yesterday's counted fires" };
-    const H = rows.length * 34 + 10, pl = 190, x = (v) => pl + v * (W - pl - 44);
-    let g = "";
-    rows.forEach((r, i) => {
-      const col = r.method.startsWith("saanjh") ? "var(--c-ember)" : r.method.startsWith("chase") ? "var(--official)" : "var(--muted)";
-      g += `<text x="${pl - 8}" y="${i * 34 + 20}" text-anchor="end" class="${r.method.startsWith("saanjh") ? "val" : ""}">${label[r.method] || r.method}</text>
-        <rect class="mark" x="${pl}" y="${i * 34 + 8}" width="${x(r.harm) - pl}" height="18" rx="4" fill="${col}"><title>${pct(r.harm)} of smoke harm, ${pct(r.energy)} of fire energy</title></rect>
-        <text class="val" x="${x(r.harm) + 6}" y="${i * 34 + 21}">${pct(r.harm)}</text>`;
-    });
-    cards.push(card(`Teams placed at noon by Saanjh reach <span style="color:var(--c-ember)">2.4×</span> more of the evening's smoke harm`,
-      `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Share of next-evening smoke harm covered by 20 field teams">${g}</svg>`,
-      `20 field teams, each patrolling ~33 km; share of the evening's smoke harm inside their blocks, every day of the 2025 test season. Fire-risk model: ROC AUC 0.90 (yesterday's counted fires alone: 0.59).`,
-      table(["teams", "placement", "harm covered", "fire energy covered"], E.planner.map(r => [r.teams, r.method, pct(r.harm), pct(r.energy)]))));
-  }
-  // 4. ablation: dumbbells, overpass inventory -> overpass + missed fires
-  {
-    const rows = E.ablation, H = rows.length * 30 + 30, pl = 190, x = (v) => pl + v / 0.5 * (W - pl - 20);
-    const name = (r) => `${r.region === "all" ? "All stations" : r.region === "Delhi-NCR" ? "Delhi-NCR" : "Near the fires"} · ${r.period}`;
-    let g = [0, 0.1, 0.2, 0.3, 0.4, 0.5].map(t => `<line x1="${x(t)}" x2="${x(t)}" y1="6" y2="${H - 22}" stroke="var(--rule)"/><text x="${x(t)}" y="${H - 8}" text-anchor="middle">${t.toFixed(1)}</text>`).join("");
-    rows.forEach((r, i) => {
-      const yy = i * 30 + 18, sig = r.ci[0] > 0;
-      g += `<text x="${pl - 8}" y="${yy + 4}" text-anchor="end" class="${sig ? "val" : ""}">${name(r)}${sig ? " ✓" : ""}</text>
-        <line x1="${x(r.overpass)}" x2="${x(r.hybrid)}" y1="${yy}" y2="${yy}" stroke="var(--muted)" stroke-width="2"/>
-        <circle class="mark" cx="${x(r.overpass)}" cy="${yy}" r="5" fill="var(--official)" stroke="var(--panel)" stroke-width="2"><title>overpass inventory r = ${r.overpass}</title></circle>
-        <circle class="mark" cx="${x(r.hybrid)}" cy="${yy}" r="5" fill="var(--c-ember)" stroke="var(--panel)" stroke-width="2"><title>+ missed fires r = ${r.hybrid}; gain 95% CI [${r.ci[0]}, ${r.ci[1]}]</title></circle>`;
-    });
-    cards.push(card(`Adding the fires the count misses explains more of the measured pollution near the fires`,
-      `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Correlation with measured PM2.5, before and after adding missed fires">${g}</svg>
-       <div class="key"><span><i style="background:var(--official)"></i>today's overpass inventory</span><span><i style="background:var(--c-ember)"></i>+ fires Saanjh saw that it missed</span></div>`,
-      `Correlation of modelled farm smoke with measured daily PM2.5 at CPCB stations (OpenAQ), 2025 held out. ✓ = 95% bootstrap CI of the gain excludes zero. No change in Delhi, where local sources dominate.`,
-      table(["stations", "period", "r overpass", "r with missed fires", "gain 95% CI"], rows.map(r => [name(r), r.period, r.overpass, r.hybrid, `[${r.ci[0]}, ${r.ci[1]}]`]))));
-  }
-  // 5. detection limit: probability of detection by fire power, both years
-  {
-    const H = 150, pl = 34, pb = 24, bins = E.detection[2025].map(b => b.bin), n = bins.length;
-    const x = (i) => pl + 10 + i * (W - pl - 30) / (n - 1), y = (v) => (H - pb) - v / 0.6 * (H - pb - 8);
-    let g = [0, 0.2, 0.4, 0.6].map(t => `<line x1="${pl}" x2="${W}" y1="${y(t)}" y2="${y(t)}" stroke="var(--rule)"/><text x="${pl - 6}" y="${y(t) + 4}" text-anchor="end">${pct(t)}</text>`).join("");
-    bins.forEach((b, i) => g += `<text x="${x(i)}" y="${H - 6}" text-anchor="middle">${b}</text>`);
-    [[2024, "var(--muted)", "4 3"], [2025, "var(--c-ember)", ""]].forEach(([yr, col, dash]) => {
-      const pts = E.detection[yr];
-      g += `<polyline fill="none" stroke="${col}" stroke-width="2" stroke-dasharray="${dash}" points="${pts.map((p, i) => `${x(i)},${y(p.pod)}`).join(" ")}"/>`;
-      pts.forEach((p, i) => g += `<circle class="mark" cx="${x(i)}" cy="${y(p.pod)}" r="4.5" fill="${col}" stroke="var(--panel)" stroke-width="2"><title>${yr}, ${p.bin} MW: ${pct(p.pod)} of ${p.n} VIIRS fire pixels</title></circle>`);
-      g += `<text class="val" x="${x(n - 1) + 8}" y="${y(pts[n - 1].pod) + 4}">${yr}</text>`;
-    });
-    cards.push(card(`GK-2A sees the big fires, not the small ones, and we report that`,
-      `<svg viewBox="0 0 ${W + 30} ${H}" role="img" aria-label="Detection probability rises with fire power, same in both years">${g}</svg>`,
-      `Share of VIIRS fire pixels GK-2A also detected at the 13:30 overpass, by fire power (MW). From 66° off vertical its pixels are ~4 km; the curve is the same in the tuning (2024) and test (2025) seasons.`,
-      table(["MW", "2024", "2025"], E.detection[2025].map((p, i) => [p.bin, pct(E.detection[2024][i].pod), pct(p.pod)]))));
-  }
-  // 6. the negative result
-  {
-    const a = Object.fromEntries(E.alerts.map(r => [r.method, r]));
-    cards.push(card(`Where it doesn't help: predicting tomorrow's worst mornings`,
-      `<p>A night-before warning built on the smoke forecast does <b>not</b> beat "tomorrow will be like today" at picking a station's worst mornings: skill ${a["persistence"].heidke.toFixed(2)} for persistence vs ${a["saanjh"].heidke.toFixed(2)} for smoke alone and ${(a["persistence+hybrid"] || a["persistence+saanjh"]).heidke.toFixed(2)} combined.</p>`,
-      `Heidke skill over ~3,400 station-mornings in 2025. Bad mornings come in multi-day stagnation spells, and farm smoke is one source among many. So Saanjh's notices say where and when farm smoke is heading, and point schools to the local PM2.5 reading.`, "", "neg"));
-  }
-  $("#ev-grid").innerHTML = cards.join("");
+  const W = 460, out = [];
+  { const d = E.season.days, H = 170, pl = 30, pb = 22, max = Math.max(...d.map((x) => x.missed_tj + x.counted_tj)), bw = (W - pl) / d.length, y = (v) => H - pb - v / max * (H - pb - 6);
+    let g = `<line x1="${pl}" x2="${W}" y1="${H - pb}" y2="${H - pb}" stroke="var(--rule-hi)"/>` + [0, Math.round(max / 2), Math.round(max)].map((t) => `<text x="${pl - 6}" y="${y(t) + 4}" text-anchor="end">${t}</text>`).join("");
+    d.forEach((x, i) => { const x0 = pl + i * bw + 1, w = Math.max(1, bw - 2), yc = y(x.counted_tj), ym = y(x.counted_tj + x.missed_tj); g += `<g class="mark"><title>${x.day}: ${x.missed_tj} TJ missed, ${x.counted_tj} TJ counted</title><rect x="${x0}" y="${yc}" width="${w}" height="${H - pb - yc}" fill="var(--c-official)"/><rect x="${x0}" y="${ym}" width="${w}" height="${Math.max(0, yc - ym - 1)}" fill="var(--c-saanjh)" rx="1.5"/></g>`; if (i % 10 === 0) g += `<text x="${x0}" y="${H - 6}">${x.day.slice(5)}</text>`; });
+    out.push(card(0, `<div class="num">${pct(E.season.missed_share)}</div>of the fire energy came after the satellites passed`, `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Daily fire energy, 2025">${g}</svg><div class="key"><span><i style="background:var(--c-saanjh)"></i>started after the pass (missed)</span><span><i style="background:var(--c-official)"></i>burning at the pass</span></div>`, `Fire radiative energy GK-2A detected per day (TJ), Punjab + Haryana, 2025 (held out). 2024: ${pct(E.season.missed_share_2024)}.`, table(["day", "missed TJ", "counted TJ"], d.map((x) => [x.day, x.missed_tj, x.counted_tj])))); }
+  { const d = E.dusk["200"].days, H = 120, pl = 10, max = 6.5, x = (v) => pl + v / max * (W - pl - 10), pooled = E.dusk["200"].pooled;
+    let g = `<line x1="${x(1)}" x2="${x(1)}" y1="8" y2="${H - 26}" stroke="var(--ink-3)" stroke-dasharray="3 3"/><text x="${x(1) + 4}" y="16">same harm</text>` + [0, 1, 2, 3, 4, 5, 6].map((t) => `<text x="${x(t)}" y="${H - 8}" text-anchor="middle">${t}×</text>`).join("");
+    d.forEach((p, i) => (g += `<circle class="mark" cx="${x(p.ratio)}" cy="${30 + (i % 7) * 9}" r="4.5" fill="var(--c-saanjh)" stroke="var(--night-1)" stroke-width="2"><title>${p.day}: ${p.ratio}×</title></circle>`));
+    g += `<line x1="${x(pooled)}" x2="${x(pooled)}" y1="8" y2="${H - 26}" stroke="var(--ink)" stroke-width="2"/><text class="val" x="${x(pooled) + 5}" y="16">${pooled}× overall</text>`;
+    out.push(card(1, `The same fire lit at 5 pm does <span style="color:var(--c-saanjh)">${pooled}×</span> the harm of one at 1 pm`, `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Exposure ratio by day">${g}</svg>`, `Population smoke exposure from identical emissions at 17:00 vs 13:00 IST, each of 47 days of 2024. After sunset the mixing layer collapses to tens of metres. 400 m plume floor: ${E.dusk["400"].pooled}×. Worse on every day.`, table(["day", "ratio"], d.map((p) => [p.day, p.ratio])))); }
+  { const rows = E.planner.filter((r) => r.teams === 20 && r.method !== "saanjh: risk only").sort((a, b) => b.harm - a.harm), lab = { "saanjh: expected harm": "Saanjh noon plan", "yesterday's GK-2A fires": "Yesterday's GK-2A fires", "last season's hotspots": "Last season's hotspots", "chase yesterday's VIIRS fires": "Chase counted fires" };
+    const H = rows.length * 34 + 10, pl = 170, x = (v) => pl + v * (W - pl - 44); let g = "";
+    rows.forEach((r, i) => { const col = r.method.startsWith("saanjh") ? "var(--c-saanjh)" : r.method.startsWith("chase") ? "var(--c-official)" : "var(--c-muted)"; g += `<text x="${pl - 8}" y="${i * 34 + 21}" text-anchor="end" class="${r.method.startsWith("saanjh") ? "val" : ""}">${lab[r.method] || r.method}</text><rect class="mark" x="${pl}" y="${i * 34 + 8}" width="${x(r.harm) - pl}" height="18" rx="4" fill="${col}"><title>${pct(r.harm)} of smoke harm</title></rect><text class="val" x="${x(r.harm) + 6}" y="${i * 34 + 21}">${pct(r.harm)}</text>`; });
+    out.push(card(2, `Teams placed at noon reach <span style="color:var(--c-saanjh)">2.4×</span> more of the evening's smoke harm`, `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Smoke harm covered by 20 teams">${g}</svg>`, `20 field teams, ~33 km patrol blocks, every day of the 2025 test season. Fire-risk model ROC AUC 0.90.`, table(["teams", "placement", "harm", "energy"], E.planner.map((r) => [r.teams, r.method, pct(r.harm), pct(r.energy)])))); }
+  { const rows = E.ablation, H = rows.length * 30 + 30, pl = 170, x = (v) => pl + v / 0.5 * (W - pl - 20), nm = (r) => `${r.region === "all" ? "All stations" : r.region === "Delhi-NCR" ? "Delhi-NCR" : "Near the fires"} · ${r.period}`;
+    let g = [0, 0.1, 0.2, 0.3, 0.4, 0.5].map((t) => `<line x1="${x(t)}" x2="${x(t)}" y1="6" y2="${H - 22}" stroke="var(--rule)"/><text x="${x(t)}" y="${H - 8}" text-anchor="middle">${t.toFixed(1)}</text>`).join("");
+    rows.forEach((r, i) => { const yy = i * 30 + 18, sig = r.ci[0] > 0; g += `<text x="${pl - 8}" y="${yy + 4}" text-anchor="end" class="${sig ? "val" : ""}">${nm(r)}${sig ? " ✓" : ""}</text><line x1="${x(r.overpass)}" x2="${x(r.hybrid)}" y1="${yy}" y2="${yy}" stroke="var(--ink-3)" stroke-width="2"/><circle class="mark" cx="${x(r.overpass)}" cy="${yy}" r="5" fill="var(--c-official)" stroke="var(--night-1)" stroke-width="2"><title>overpass r=${r.overpass}</title></circle><circle class="mark" cx="${x(r.hybrid)}" cy="${yy}" r="5" fill="var(--c-saanjh)" stroke="var(--night-1)" stroke-width="2"><title>+ missed fires r=${r.hybrid}; CI [${r.ci[0]}, ${r.ci[1]}]</title></circle>`; });
+    out.push(card(3, `Adding the missed fires explains more of the measured pollution near the fires`, `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Correlation with measured PM2.5">${g}</svg><div class="key"><span><i style="background:var(--c-official)"></i>today's overpass inventory</span><span><i style="background:var(--c-saanjh)"></i>+ fires Saanjh saw</span></div>`, `Correlation of modelled farm smoke with measured daily PM2.5 at CPCB stations, 2025 held out. ✓ = 95% CI of the gain excludes zero. No change in Delhi, where local sources dominate.`, table(["stations", "r overpass", "r with missed fires", "CI"], rows.map((r) => [nm(r), r.overpass, r.hybrid, `[${r.ci[0]}, ${r.ci[1]}]`])))); }
+  { const H = 150, pl = 34, pb = 24, bins = E.detection[2025].map((b) => b.bin), n = bins.length, x = (i) => pl + 10 + i * (W - pl - 40) / (n - 1), y = (v) => H - pb - v / 0.6 * (H - pb - 8);
+    let g = [0, 0.2, 0.4, 0.6].map((t) => `<line x1="${pl}" x2="${W}" y1="${y(t)}" y2="${y(t)}" stroke="var(--rule)"/><text x="${pl - 6}" y="${y(t) + 4}" text-anchor="end">${pct(t)}</text>`).join("") + bins.map((b, i) => `<text x="${x(i)}" y="${H - 6}" text-anchor="middle">${b}</text>`).join("");
+    [[2024, "var(--c-muted)", "4 3"], [2025, "var(--c-saanjh)", ""]].forEach(([yr, col, dash]) => { const p = E.detection[yr]; g += `<polyline fill="none" stroke="${col}" stroke-width="2" stroke-dasharray="${dash}" points="${p.map((q, i) => `${x(i)},${y(q.pod)}`).join(" ")}"/>` + p.map((q, i) => `<circle class="mark" cx="${x(i)}" cy="${y(q.pod)}" r="4.5" fill="${col}" stroke="var(--night-1)" stroke-width="2"><title>${yr}, ${q.bin} MW: ${pct(q.pod)}</title></circle>`).join("") + `<text class="val" x="${x(n - 1) + 8}" y="${y(p[n - 1].pod) + 4}">${yr}</text>`; });
+    out.push(card(4, `GK-2A sees the big fires, not the small ones — and we report that`, `<svg viewBox="0 0 ${W + 30} ${H}" role="img" aria-label="Detection by fire power">${g}</svg>`, `Share of VIIRS fire pixels GK-2A also detected at the 13:30 overpass, by fire power (MW). From 66° off vertical its pixels are ~4 km; the curve is the same in 2024 and 2025.`, table(["MW", "2024", "2025"], E.detection[2025].map((p, i) => [p.bin, pct(E.detection[2024][i].pod), pct(p.pod)])))); }
+  { const a = Object.fromEntries(E.alerts.map((r) => [r.method, r]));
+    out.push(card(5, `Where it doesn't help: predicting tomorrow's worst mornings`, `<p class="lede" style="margin:8px 0 0">A night-before warning built on the smoke forecast does <b>not</b> beat "tomorrow will be like today": skill ${a.persistence.heidke.toFixed(2)} for persistence vs ${a.saanjh.heidke.toFixed(2)} for smoke alone and ${(a["persistence+hybrid"] || a["persistence+saanjh"]).heidke.toFixed(2)} combined.</p>`, `Heidke skill over ~3,400 station-mornings, 2025. Bad mornings come in multi-day stagnation spells. So Saanjh's notices say where and when farm smoke is heading, and point schools to the local PM2.5 reading.`, "", "neg")); }
+  $("#ev-grid").innerHTML = out.join("");
 }
 
-/* ---------- tabs ---------- */
-function selectTab(which) {
-  for (const t of ["res", "off", "plan"]) { $("#t-" + t).setAttribute("aria-selected", t === which); $("#p-" + t).hidden = t !== which; }
-  S.tab = which; $("#legend-plan").hidden = which !== "plan"; $("#legend-main").hidden = which === "plan"; draw();
-}
-$("#t-res").addEventListener("click", () => selectTab("res"));
-$("#t-off").addEventListener("click", () => selectTab("off"));
-$("#t-plan").addEventListener("click", () => selectTab("plan"));
+load().catch((e) => { console.error(e); $("#loader").classList.add("done"); toast("Tonight's data hasn't been published yet. It updates every hour from 12:30 IST."); });
 </script>
 </body>
 </html>

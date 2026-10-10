@@ -213,8 +213,15 @@ def tonight(day, met, events, hours=30, viirs=None):
         by_state = per_src[n].groupby(state).sum().sort_values(ascending=False) / tot
         area = pd.Series([f"near {a}, {st}" for a, st in zip(near, state)], index=src.index)
         by_area = per_src[n].groupby(area.to_numpy()).sum().sort_values(ascending=False) / tot
+        top = (per_src[n] / tot).sort_values(ascending=False).head(8)
         origins[n] = dict(from_states=[dict(name=k, share=round(float(v), 3)) for k, v in by_state.items() if v >= 0.01],
-                          from_areas=[dict(name=k, share=round(float(v), 3)) for k, v in by_area.head(5).items()])
+                          from_areas=[dict(name=k, share=round(float(v), 3)) for k, v in by_area.head(5).items()],
+                          # the individual fires (or VIIRS cells) that put the most smoke into this town tonight
+                          from_fires=[dict(lat=round(float(src.lat[i]), 4), lon=round(float(src.lon[i]), 4),
+                                           share=round(float(v), 3), near=f"{near[src.index.get_loc(i)]}",
+                                           state=str(state[src.index.get_loc(i)]), source=str(src.source[i]),
+                                           first_ist=str(src.first_ist[i]))
+                                      for i, v in top.items() if v >= 0.02])
     src = src.sort_values("harm", ascending=False)
     t0 = met.t0 + timedelta(hours=float(t_h.min()))
     # Ensemble: perturbed weather (wind direction/speed, mixing height, plume floor) -> probabilities per town.
