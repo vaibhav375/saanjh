@@ -12,7 +12,10 @@ jobs:
           python-version: "3.12"
           cache: pip
       - name: Install
-        run: pip install -r requirements.txt aws-sam-cli
+        run: pip install -r requirements.txt
+      - uses: aws-actions/setup-sam@v2
+        with:
+          use-installer: true
       - name: Tests (geolocation, detector, tree export, planner, handlers on mocked AWS, page script)
         run: python -m pytest -q
       - name: Lint the AWS SAM template

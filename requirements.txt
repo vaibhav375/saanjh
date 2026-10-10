@@ -10,7 +10,7 @@ matplotlib
 requests
 pytest
 moto[s3,sns]
-strands-agents[openai]
+strands-agents[openai]>=1.0
 aws-bedrock-token-generator
 scikit-learn
 pyyaml
