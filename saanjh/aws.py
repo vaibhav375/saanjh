@@ -7,6 +7,7 @@ model_handler   {"day": ..., "replay": true} or a scheduled event (live, today i
                 Builds fire events, runs the smoke model, writes site/tonight.json (live) or
                 results/<yyyymmdd>.json (replay), and publishes smoke alerts (live only).
 """
+import base64
 import io
 import json
 import os
@@ -178,13 +179,14 @@ def _alert(day, towns):
 
 
 STATIC = os.path.join(os.path.dirname(__file__), "..", "site")
-TYPES = {".html": "text/html; charset=utf-8", ".json": "application/json"}
+TYPES = {".html": "text/html; charset=utf-8", ".json": "application/json", ".yaml": "application/yaml"}
 
 
 def site_handler(event, _ctx=None):
     """Function URL: the page and borders from the package, tonight.json from the site bucket,
     or a replayed day's results with ?day=YYYY-MM-DD."""
     path = event.get("rawPath", "/").lstrip("/") or "index.html"
+    path = {"api": "api.html", "api/": "api.html"}.get(path, path)
     q = event.get("queryStringParameters") or {}
     try:
         if path == "plan.json":
@@ -203,6 +205,8 @@ def site_handler(event, _ctx=None):
                 body = s3.get_object(Bucket=SITE, Key="tonight.json")["Body"].read()
             return dict(statusCode=200, headers={"Content-Type": TYPES[".json"], "Cache-Control": "max-age=60"},
                         body=body.decode())
+        if path == "briefing.pdf":
+            return _briefing(q.get("district", ""), q.get("day", ""))
         if path == "status.json":
             return dict(statusCode=200, headers={"Content-Type": TYPES[".json"], "Cache-Control": "max-age=60"},
                         body=json.dumps(_status()))
@@ -217,7 +221,7 @@ def site_handler(event, _ctx=None):
         if path == "config.json":
             return dict(statusCode=200, headers={"Content-Type": TYPES[".json"]},
                         body=json.dumps({"agent_url": os.environ.get("AGENT_URL", "")}))
-        if path in ("index.html", "borders.json", "evidence.json", "districts.json"):
+        if path in ("index.html", "borders.json", "evidence.json", "districts.json", "api.html", "openapi.yaml"):
             with open(os.path.join(STATIC, path), encoding="utf-8") as f:
                 return dict(statusCode=200, headers={"Content-Type": TYPES[os.path.splitext(path)[1]],
                                                      "Cache-Control": "max-age=300"}, body=f.read())
@@ -322,3 +326,29 @@ def _status():
         alarms=[dict(name=a["AlarmName"].replace("saanjh-", ""), state=a["StateValue"]) for a in alarms])
     _STATUS.update(at=_t.time(), body=body)
     return body
+
+
+def _briefing(name, day):
+    """One-page PDF for a district's officers, built on demand from the night, the plan and the season record."""
+    from saanjh import briefing
+    D = json.load(open(os.path.join(STATIC, "districts.json"), encoding="utf-8"))
+    k = next((i for i, d in enumerate(D["districts"]) if d["name"].lower() == name.strip().lower()), None)
+    if k is None:
+        return dict(statusCode=404, headers={"Content-Type": "text/plain"}, body="Unknown district")
+    ok_day = re.fullmatch(r"\d{4}-\d{2}-\d{2}", day or "")
+
+    def get(live_key, replay_key):
+        try:
+            if ok_day:
+                return json.loads(s3.get_object(Bucket=BUCKET, Key=replay_key)["Body"].read())
+            return json.loads(s3.get_object(Bucket=SITE, Key=live_key)["Body"].read())
+        except s3.exceptions.NoSuchKey:
+            return None
+    d8 = day.replace("-", "") if ok_day else ""
+    night, plan = get("tonight.json", f"results/{d8}.json"), get("plan.json", f"results/plan_{d8}.json")
+    if night:
+        night.pop("frames", None)
+    pdf = briefing.build(D["geo"]["features"][k], night, plan, D["districts"][k])
+    fname = f"saanjh-{D['districts'][k]['name'].lower().replace(' ', '-')}-{(night or plan or {}).get('day', 'tonight')}.pdf"
+    return dict(statusCode=200, isBase64Encoded=True, body=base64.b64encode(pdf).decode(),
+                headers={"Content-Type": "application/pdf", "Content-Disposition": f'inline; filename="{fname}"'})

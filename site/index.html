@@ -158,7 +158,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .okey { display: flex; flex-wrap: wrap; gap: 4px 12px; font: 400 11.5px var(--mono); color: var(--ink-2); }
 .okey i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 5px; }
 .act { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
-.btn { border: 1px solid var(--rule-hi); background: rgba(150,196,222,.06); padding: 8px 12px; border-radius: 9px; font: 600 12.5px var(--text); color: var(--ink); transition: border-color .2s, background .2s; }
+.btn { text-decoration: none; display: inline-block; border: 1px solid var(--rule-hi); background: rgba(150,196,222,.06); padding: 8px 12px; border-radius: 9px; font: 600 12.5px var(--text); color: var(--ink); transition: border-color .2s, background .2s; }
 .btn:hover { border-color: rgba(244,162,89,.55); background: rgba(244,162,89,.1); }
 .btn.primary { background: linear-gradient(180deg, #F7B375, #F09A4E); color: var(--night-0); border-color: transparent; }
 
@@ -330,6 +330,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     <p class="lede"><b>Whole seasons</b> (15 Oct – 30 Nov): what each district's official fire count showed, against the fire energy GK-2A actually saw.</p>
     <div class="seg" role="group" aria-label="Season"><button type="button" data-y="2025" aria-pressed="true">2025 vs 2024</button><button type="button" data-y="2024" aria-pressed="false">2024 season</button></div>
     <div class="card" id="disthead" style="margin-top:4px"></div>
+    <div id="distcard"></div>
     <ul class="rows" id="dists"></ul>
     <p class="fine" style="margin-top:10px">Fire energy is what GK-2A could see: it misses small fires and ~30% of its detections have no VIIRS match, so treat district numbers as indicative. Official counts are VIIRS fires at the ~13:30 pass.</p>
   </div>
@@ -384,7 +385,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 <div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="ev-h">
   <div class="sheet-inner">
     <button class="sheet-close" id="close-ev" type="button" aria-label="Close">✕</button>
-    <div class="eyebrow">Evidence · two seasons replayed on AWS</div>
+    <div class="eyebrow">Evidence · two seasons replayed on AWS · <a href="api" target="_blank" rel="noopener" style="color:var(--dusk)">open API</a> · <a href="https://github.com/vaibhav375/saanjh" target="_blank" rel="noopener" style="color:var(--dusk)">code</a></div>
     <h2 id="ev-h">How we know it works</h2>
     <p class="lede">Every image GK-2A took of Punjab and Haryana, 15 Oct – 30 Nov, in 2024 and 2025. Methods were tuned on 2024 and tested on 2025, a season they never saw — including the one place where Saanjh doesn't help.</p>
     <div class="ev-grid" id="ev-grid"></div>
@@ -401,6 +402,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   <div class="sgrid" id="sgrid"></div>
   <ul class="alarms" id="alarms"></ul>
   <p class="fine" style="margin:12px 0 0">Every GK-2A image triggers NOAA's SNS topic → SQS → Lambda. Failed images go to a dead-letter queue; alarms page the operator by email.</p>
+  <p style="margin:10px 0 0"><a class="btn" href="api" target="_blank" rel="noopener">Open API for forecasters →</a></p>
 </div>
 <div class="toast glass" id="toast" role="status"></div>
 
@@ -903,6 +905,8 @@ function selectDistrict(k, fly) {
   const d = S.dist.districts[k], f = S.dist.geo.features[k], b = new maplibregl.LngLatBounds();
   f.geometry.coordinates.forEach((poly) => poly[0].forEach((c) => b.extend(c)));
   if (fly) map.fitBounds(b, { padding: 80, pitch: 45, maxZoom: 9.5, duration: 1600 });
+  const url = `briefing.pdf?district=${encodeURIComponent(d.name)}${S.day ? `&day=${S.day}` : ""}`;
+  $("#distcard").innerHTML = `<div class="card"><h3>${esc(d.name)}</h3><p>Tonight's one-page briefing for the district's officers: team blocks, fires, and when smoke reaches its towns.</p><div class="act"><a class="btn primary" href="${url}" target="_blank" rel="noopener">Download tonight's briefing (PDF)</a></div></div>`;
   const y = S.dyear, s = d["y" + y];
   new maplibregl.Popup({ closeButton: false, offset: 10 }).setLngLat(d.centre).setHTML(`<div class="pop"><b>${esc(d.name)}, ${d.state}</b><div class="fine">${y}: ${s.official_fires} fires counted · ${s.fire_energy_tj} TJ seen by GK-2A · ${Math.round((s.missed_share || 0) * 100)}% started after the pass${y === "2025" ? `<br>vs 2024: count ${d.official_change > 0 ? "+" : ""}${Math.round(d.official_change * 100)}%, energy ${d.energy_change > 0 ? "+" : ""}${Math.round(d.energy_change * 100)}%` : ""}</div></div>`).addTo(map);
 }

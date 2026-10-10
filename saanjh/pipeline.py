@@ -252,6 +252,8 @@ def tonight(day, met, events, hours=30, viirs=None):
         got = arrs[np.isfinite(arrs)]
         a = int(np.median(got)) if len(got) > len(arrs) / 2 else None
         over = [a] if a is not None else []
+        if a is not None:
+            k_peak = max(k_peak, a)  # the median arrival comes from the ensemble; never report a peak before it
         ens = dict(p_watch=round(float((peaks >= 10).mean()), 2), p_alert=round(float((peaks >= 25).mean()), 2),
                    members=len(peaks), peak_central=round(float(series.max()), 1),
                    arrive_window=[f"{t0 + timedelta(hours=int(got.min())) + IST:%a %H:%M}",

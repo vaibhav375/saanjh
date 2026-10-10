@@ -57,6 +57,16 @@ An "Ask Saanjh" assistant (Strands Agents SDK, open-weight Qwen3 on Amazon Bedro
 Everything is in [template.yaml](template.yaml) (AWS SAM). The Lambdas run next to NOAA's bucket, which
 matters: from a laptop in India each crop takes ~17 s to download; in us-east-1 it takes about a second.
 
+## Open API, operations, CI
+
+- **Open API** (no key): `/tonight.json`, `/plan.json`, `/days.json`, `/districts.json`, `/status.json`,
+  `/briefing.pdf?district=…`, documented as OpenAPI 3.1 at [`/api`](site/openapi.yaml).
+- **Operations:** CloudWatch Embedded-Metric-Format metrics (image latency, throughput, detections), alarms on Lambda
+  errors, pipeline lag, queue backlog and dead letters (to an ops SNS topic), a CloudWatch dashboard, and a live
+  System panel in the app.
+- **CI:** GitHub Actions runs the tests (handlers on mocked AWS, tree export, planner, page script), lints the SAM
+  template and validates the OpenAPI spec on every push.
+
 ## Repository
 
 | Path | What it is |
@@ -67,6 +77,7 @@ matters: from a laptop in India each crop takes ~17 s to download; in us-east-1 
 | `saanjh/risk.py` | Tomorrow's fire risk (exported gradient-boosted trees, numpy-only) and the greedy team planner |
 | `saanjh/pipeline.py` | One evening end to end: fire events, counted vs missed, ranking, town arrival times, page JSON |
 | `saanjh/aws.py` | Lambda handlers (live SQS, day replay, hourly model, alerts, the page) |
+| `saanjh/briefing.py` | One-page district briefing PDF for officers, built in Lambda |
 | `saanjh/agent.py` | "Ask Saanjh": a Strands Agents assistant on Amazon Bedrock that explains the ranking from the published data |
 | `site/` | The public page and officer console (static, reads `tonight.json`) |
 | `scripts/` | Data fetchers, scoring against VIIRS, dusk-penalty experiment, packaging |

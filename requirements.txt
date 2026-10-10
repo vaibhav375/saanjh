@@ -12,3 +12,6 @@ pytest
 moto[s3,sns]
 strands-agents[openai]
 aws-bedrock-token-generator
+scikit-learn
+pyyaml
+fpdf2

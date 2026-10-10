@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Saanjh API</title>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,400..800&family=Public+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  body { margin: 0; background: #F4F6F7; }
+  .bar { display: flex; align-items: center; gap: 14px; padding: 14px 24px; background: #07131C; color: #EAF1F4; font: 600 14px "Public Sans", sans-serif; }
+  .bar b { font: 760 18px "Archivo", sans-serif; font-stretch: 118%; letter-spacing: .04em; }
+  .bar a { color: #F4A259; text-decoration: none; margin-left: auto; }
+</style>
+</head>
+<body>
+<div class="bar"><b>SAANJH</b> Open API <a href="./">← Back to the map</a></div>
+<div id="redoc"></div>
+<script src="https://cdn.jsdelivr.net/npm/redoc@2.1.3/bundles/redoc.standalone.js"></script>
+<script>
+  // Redoc theming to match the app: blue-hour navy and dusk amber.
+  window.addEventListener("load", () => Redoc.init("openapi.yaml", { theme: {
+    colors: { primary: { main: "#C9772E" } },
+    typography: { fontFamily: "Public Sans, sans-serif", headings: { fontFamily: "Archivo, sans-serif" }, code: { fontFamily: "IBM Plex Mono, monospace" } },
+    sidebar: { backgroundColor: "#0C1D29", textColor: "#EAF1F4" }, rightPanel: { backgroundColor: "#12293A" } } }, document.getElementById("redoc")));
+</script>
+</body>
+</html>

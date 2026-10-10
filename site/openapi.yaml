@@ -1,0 +1,123 @@
+openapi: 3.1.0
+info:
+  title: Saanjh API
+  version: "1.0"
+  summary: Evening farm-fire detections, smoke forecasts and field-team plans for Punjab and Haryana.
+  description: |
+    Open, read-only JSON from Saanjh's AWS pipeline (Lambda Function URLs, us-east-1). Air-quality forecasters,
+    researchers and state agencies can use it without a key. Every endpoint without `day` returns tonight's live
+    data; with `day=YYYY-MM-DD` it returns a replayed night from the 2024 or 2025 season.
+
+    Units: fire radiative power in MW, fire radiative energy in MJ/TJ, smoke as PM2.5 in µg/m³ (the farm-fire share
+    only, from the Saanjh smoke model), times in UTC unless a field ends in `_ist`.
+  license: { name: MIT, identifier: MIT }
+  contact: { name: Saanjh, url: https://github.com/vaibhav375/saanjh }
+servers:
+  - url: https://vxm2hfcv2m5ncjsydmsnkon7n40azecu.lambda-url.us-east-1.on.aws
+    description: Live (AWS Lambda Function URL)
+paths:
+  /tonight.json:
+    get:
+      summary: Tonight's fires, smoke and towns
+      description: Updated hourly 12:35–00:35 IST by the model Lambda. Fires are ranked by population smoke exposure.
+      parameters: [{ $ref: "#/components/parameters/day" }]
+      responses:
+        "200": { description: The night, content: { application/json: { schema: { $ref: "#/components/schemas/Night" } } } }
+        "404": { description: No data for that day }
+  /plan.json:
+    get:
+      summary: Noon field-team plan
+      description: Made at 11:30 IST from the fire-risk model. Replays include the fires that actually burned that evening.
+      parameters: [{ $ref: "#/components/parameters/day" }]
+      responses:
+        "200": { description: The plan, content: { application/json: { schema: { $ref: "#/components/schemas/Plan" } } } }
+  /days.json:
+    get:
+      summary: Replay days available
+      responses:
+        "200":
+          description: Days with replayed nights and with plans
+          content: { application/json: { schema: { type: object, properties: { replays: { type: array, items: { type: string, format: date } }, plans: { type: array, items: { type: string, format: date } } } } } }
+  /districts.json:
+    get:
+      summary: District accountability, 2024 and 2025 seasons
+      description: Per district, the official fire count (VIIRS at the ~13:30 pass) against the fire energy GK-2A saw, with simplified outlines.
+      responses: { "200": { description: Districts and outlines (GeoJSON), content: { application/json: { schema: { type: object } } } } }
+  /status.json:
+    get:
+      summary: Live pipeline health
+      description: From CloudWatch, cached 60 s. Images processed, latency, errors, alarm states and Lambda cost over 24 hours.
+      responses:
+        "200":
+          description: Health
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  last_image: { type: [string, "null"], format: date-time }
+                  images_24h: { type: integer }
+                  detections_24h: { type: integer }
+                  latency_p50_min: { type: number }
+                  errors_24h: { type: integer }
+                  lambda_cost_24h_usd: { type: number }
+                  alarms: { type: array, items: { type: object, properties: { name: { type: string }, state: { type: string, enum: [OK, ALARM, INSUFFICIENT_DATA] } } } }
+  /evidence.json:
+    get:
+      summary: The measured results shown on the evidence page
+      responses: { "200": { description: Results, content: { application/json: { schema: { type: object } } } } }
+  /briefing.pdf:
+    get:
+      summary: Printable district briefing for tonight
+      description: One-page PDF for a district's officers, generated on demand by Lambda.
+      parameters:
+        - { name: district, in: query, required: true, schema: { type: string }, example: Sangrur }
+        - { $ref: "#/components/parameters/day" }
+      responses: { "200": { description: PDF, content: { application/pdf: {} } }, "404": { description: Unknown district } }
+components:
+  parameters:
+    day: { name: day, in: query, required: false, schema: { type: string, format: date }, example: "2025-11-10", description: Replay a night of the 2024 or 2025 season }
+  schemas:
+    Fire:
+      type: object
+      properties:
+        lat: { type: number }
+        lon: { type: number }
+        near: { type: string, example: "Ratia 4 km" }
+        first_ist: { type: string, example: "16:20" }
+        scans: { type: integer, description: 10-minute GK-2A images it was seen in }
+        frp_peak: { type: number, description: MW }
+        pm25_kg: { type: number }
+        counted: { type: boolean, description: Burning at the VIIRS overpass and seen by VIIRS }
+        harm: { type: number, description: Population smoke exposure (µg/m³ · person · h) }
+        source: { type: string, enum: [GK-2A, VIIRS] }
+        curve: { type: array, items: { type: array, items: { type: number } }, description: "[minutes after 12:00 IST, MW] every 10 minutes" }
+    Town:
+      type: object
+      properties:
+        town: { type: string }
+        peak_ugm3: { type: number, description: Median farm-smoke peak over 9 weather scenarios }
+        p_alert: { type: number, description: Share of scenarios above 25 µg/m³ }
+        arrives_ist: { type: string }
+        peak_ist: { type: string }
+        from_states: { type: array, items: { type: object, properties: { name: { type: string }, share: { type: number } } } }
+        from_fires: { type: array, items: { type: object, properties: { lat: { type: number }, lon: { type: number }, share: { type: number }, near: { type: string } } } }
+    Night:
+      type: object
+      properties:
+        day: { type: string, format: date }
+        replay: { type: boolean }
+        stats: { type: object, properties: { events: { type: integer }, counted: { type: integer }, uncounted_energy_share: { type: number }, pm25_t: { type: number } } }
+        fires: { type: array, items: { $ref: "#/components/schemas/Fire" } }
+        towns: { type: array, items: { $ref: "#/components/schemas/Town" } }
+        grid: { type: object, description: "Smoke frame grid: lat0, lon0, d (deg), ny, nx, t0" }
+        frames: { type: array, items: { type: string, contentEncoding: base64 }, description: "Hourly uint8 frames; µg/m³ = 10^((v−150)/50)" }
+    Plan:
+      type: object
+      properties:
+        day: { type: string, format: date }
+        grid: { type: object }
+        expected_harm: { type: array, items: { type: integer }, description: Per 0.1° cell, scaled 0–1000 }
+        p_fire: { type: array, items: { type: integer }, description: Percent }
+        teams: { type: array, items: { type: object, properties: { row: { type: integer }, col: { type: integer }, share: { type: number } } } }
+        actual_covered_share: { type: number, description: Replays only }

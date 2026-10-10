@@ -66,3 +66,22 @@ def test_site_serves_page_live_json_and_replays(monkeypatch):
     assert r["body"] == '{"replay": 1}'
     assert aws.site_handler({"rawPath": "/tonight.json", "queryStringParameters": {"day": "../x"}})["body"] == '{"live": 1}'
     assert aws.site_handler({"rawPath": "/../template.yaml"})["statusCode"] == 404
+
+
+@mock_aws
+def test_briefing_pdf_for_a_district(monkeypatch):
+    import base64
+    monkeypatch.setenv("AWS_DEFAULT_REGION", "us-east-1")
+    from saanjh import aws
+    s3 = boto3.client("s3")
+    for b in ("data-b", "site-b"):
+        s3.create_bucket(Bucket=b)
+    s3.put_object(Bucket="site-b", Key="tonight.json", Body=open("site/tonight.json", "rb").read())
+    s3.put_object(Bucket="site-b", Key="plan.json", Body=open("site/plan.json", "rb").read())
+    monkeypatch.setattr(aws, "s3", s3)
+    monkeypatch.setattr(aws, "BUCKET", "data-b")
+    monkeypatch.setattr(aws, "SITE", "site-b")
+    r = aws.site_handler({"rawPath": "/briefing.pdf", "queryStringParameters": {"district": "sangrur"}})
+    assert r["statusCode"] == 200 and r["headers"]["Content-Type"] == "application/pdf"
+    assert base64.b64decode(r["body"])[:5] == b"%PDF-"
+    assert aws.site_handler({"rawPath": "/briefing.pdf", "queryStringParameters": {"district": "Atlantis"}})["statusCode"] == 404
