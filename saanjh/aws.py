@@ -217,7 +217,7 @@ def site_handler(event, _ctx=None):
         if path == "config.json":
             return dict(statusCode=200, headers={"Content-Type": TYPES[".json"]},
                         body=json.dumps({"agent_url": os.environ.get("AGENT_URL", "")}))
-        if path in ("index.html", "borders.json", "evidence.json"):
+        if path in ("index.html", "borders.json", "evidence.json", "districts.json"):
             with open(os.path.join(STATIC, path), encoding="utf-8") as f:
                 return dict(statusCode=200, headers={"Content-Type": TYPES[os.path.splitext(path)[1]],
                                                      "Cache-Control": "max-age=300"}, body=f.read())

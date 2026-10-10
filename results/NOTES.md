@@ -238,3 +238,11 @@ GK-2A fires. Caveat: harm weights used ERA5 (actual) weather; the live plan uses
   10 Nov 2025 was 54 µg/m³ in the central run but 14 µg/m³ as the median, with 1 of 9 scenarios above 25. Towns
   are now read over 3×3 model cells (~15 km) to cut particle sampling noise.
 - **Fire stories.** Each GK-2A fire keeps its 10-minute fire-power series; the page draws it against the 13:30 pass.
+
+## District accountability (`scripts/build_districts.py`, 43 districts of Punjab and Haryana)
+
+Every GK-2A fire event of both seasons and every VIIRS fire behind the official count, assigned to its district
+(geoBoundaries ADM2). 2025 vs 2024: official counts fell in 37 of 43 districts; in 16 of those the fire energy
+GK-2A saw rose. Examples: Sangrur count −69%, energy +15%; Bathinda −59% / +55%; Fazilka −36% / +58%;
+Mansa −67% / +45%. Caveat: district energy inherits GK-2A's limits (small fires missed; ~30% of detections
+unmatched by VIIRS on the held-out season), so district numbers are indicative.

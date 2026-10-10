@@ -69,6 +69,11 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .arch .flow { fill: #FFD08A; }
 .arch .grp { fill: none; stroke: rgba(150,196,222,.16); stroke-dasharray: 4 4; }
 .arch .grpl { font: 500 10.5px var(--mono); fill: var(--ink-3); letter-spacing: .08em; text-transform: uppercase; }
+.row.drow { grid-template-columns: 1fr auto auto; }
+.row.drow .s { grid-column: 1 / -1; }
+.chg { font: 600 12.5px var(--mono); padding: 3px 7px; border-radius: 6px; white-space: nowrap; }
+.chg.down { color: #8FD6EA; background: rgba(31,162,201,.14); } .chg.up { color: #FFB38A; background: rgba(228,106,36,.16); }
+.chg small { font-weight: 400; color: var(--ink-3); margin-right: 4px; }
 /* top bar */
 .top { position: fixed; top: 14px; left: 14px; right: 14px; display: flex; gap: 10px; align-items: center; z-index: 5; pointer-events: none; }
 .top > * { pointer-events: auto; }
@@ -111,10 +116,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .kpi b { display: block; font: 700 18px/1.1 var(--display); font-stretch: 110%; font-variant-numeric: tabular-nums; }
 .kpi span { font: 400 11px/1.25 var(--text); color: var(--ink-3); }
 
-.tabs { display: grid; grid-template-columns: repeat(3, 1fr); position: relative; margin: 12px 14px 0; padding: 4px; background: rgba(7,19,28,.6); border-radius: 11px; border: 1px solid var(--rule); }
+.tabs { display: grid; grid-template-columns: repeat(4, 1fr); position: relative; margin: 12px 14px 0; padding: 4px; background: rgba(7,19,28,.6); border-radius: 11px; border: 1px solid var(--rule); }
 .tabs button { position: relative; z-index: 1; border: 0; background: transparent; padding: 9px 6px; font: 600 12.5px/1.2 var(--text); color: var(--ink-2); border-radius: 8px; transition: color .25s var(--ease); }
 .tabs button[aria-selected="true"] { color: var(--night-0); }
-.tabs .slider { position: absolute; z-index: 0; top: 4px; bottom: 4px; left: 4px; width: calc((100% - 8px) / 3); border-radius: 8px;
+.tabs .slider { position: absolute; z-index: 0; top: 4px; bottom: 4px; left: 4px; width: calc((100% - 8px) / 4); border-radius: 8px;
   background: linear-gradient(180deg, #F7B375, #F09A4E); box-shadow: 0 4px 14px rgba(244,162,89,.35); transition: transform .38s var(--ease); }
 .pane { flex: 1; overflow: auto; padding: 14px 16px 18px; scrollbar-width: thin; scrollbar-color: var(--night-3) transparent; }
 .lede { margin: 0 0 12px; color: var(--ink-2); font-size: 13.5px; }
@@ -311,14 +316,22 @@ button { font: inherit; color: inherit; cursor: pointer; }
   </section>
   <div class="tabs" role="tablist" aria-label="Views">
     <i class="slider" id="tabslider" aria-hidden="true"></i>
-    <button role="tab" id="t-towns" aria-selected="true" aria-controls="p-towns">Smoke tonight</button>
-    <button role="tab" id="t-fires" aria-selected="false" aria-controls="p-fires">Fires that matter</button>
-    <button role="tab" id="t-teams" aria-selected="false" aria-controls="p-teams">Send teams</button>
+    <button role="tab" id="t-towns" aria-selected="true" aria-controls="p-towns">Smoke</button>
+    <button role="tab" id="t-fires" aria-selected="false" aria-controls="p-fires">Fires</button>
+    <button role="tab" id="t-teams" aria-selected="false" aria-controls="p-teams">Teams</button>
+    <button role="tab" id="t-dist" aria-selected="false" aria-controls="p-dist">Districts</button>
   </div>
   <div class="pane" id="p-towns" role="tabpanel" aria-labelledby="t-towns">
     <p class="lede">Towns where farm-fire smoke is expected tonight. Pick one to see when it arrives, how sure we are, and <b>which fires it comes from</b>.</p>
     <ul class="rows" id="towns"></ul>
     <div id="towncard"></div>
+  </div>
+      <div class="pane" id="p-dist" role="tabpanel" aria-labelledby="t-dist" hidden>
+    <p class="lede"><b>Whole seasons</b> (15 Oct – 30 Nov): what each district's official fire count showed, against the fire energy GK-2A actually saw.</p>
+    <div class="seg" role="group" aria-label="Season"><button type="button" data-y="2025" aria-pressed="true">2025 vs 2024</button><button type="button" data-y="2024" aria-pressed="false">2024 season</button></div>
+    <div class="card" id="disthead" style="margin-top:4px"></div>
+    <ul class="rows" id="dists"></ul>
+    <p class="fine" style="margin-top:10px">Fire energy is what GK-2A could see: it misses small fires and ~30% of its detections have no VIIRS match, so treat district numbers as indicative. Official counts are VIIRS fires at the ~13:30 pass.</p>
   </div>
   <div class="pane" id="p-fires" role="tabpanel" aria-labelledby="t-fires" hidden>
     <p class="lede">Fires GK-2A saw this afternoon and evening, ranked by how much smoke each puts into people's air over the next day. Pick one to fly there.</p>
@@ -593,23 +606,27 @@ function renderHero() {
 }
 
 /* ---------- tabs ---------- */
-const TABS = ["towns", "fires", "teams"];
+const TABS = ["towns", "fires", "teams", "dist"];
 const layerOn = { smoke: true, fires: true, counted: true, terrain: true };
 const SMOKE_OPACITY = ["interpolate", ["linear"], ["zoom"], 6, 0.92, 8.5, 0.6, 10, 0.3, 12, 0.14]; // a regional haze, not a wash over villages
 function vis(id, on) { if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", on ? "visible" : "none"); }
 function syncLayers() {
   const plan = S.tab === "teams";
+  const dist = S.tab === "dist", night = !plan && !dist;
   ["risk", "blocks", "blocks-n", "actual"].forEach((id) => vis(id, plan));
-  ["cl", "cl-glow", "cl-n", "fire", "fire-glow"].forEach((id) => vis(id, !plan && layerOn.fires));
-  ["arcs", "arcs-base", "origins", "origins-l"].forEach((id) => vis(id, !plan));
-  vis("counted", !plan && layerOn.counted);
-  if (map.getLayer("smoke")) map.setPaintProperty("smoke", "raster-opacity", !layerOn.smoke ? 0 : plan ? 0.22 : SMOKE_OPACITY);
+  ["dist-fill", "dist-line", "dist-l"].forEach((id) => vis(id, dist));
+  ["cl", "cl-glow", "cl-n", "fire", "fire-glow"].forEach((id) => vis(id, night && layerOn.fires));
+  ["arcs", "arcs-base", "origins", "origins-l", "pulse"].forEach((id) => vis(id, night));
+  vis("counted", night && layerOn.counted);
+  ["town-dot", "town-l"].forEach((id) => vis(id, !dist));
+  if (map.getLayer("smoke")) map.setPaintProperty("smoke", "raster-opacity", !layerOn.smoke || dist ? 0 : plan ? 0.22 : SMOKE_OPACITY);
 }
 function selectTab(t) {
   S.tab = t;
   TABS.forEach((x, i) => { $("#t-" + x).setAttribute("aria-selected", x === t); $("#p-" + x).hidden = x !== t; if (x === t) $("#tabslider").style.transform = `translateX(${i * 100}%)`; });
   syncLayers(); renderLegend();
   if (t === "teams") { renderPlan(); if (S.plan) map.easeTo({ pitch: 60, bearing: -26, zoom: 6.9, center: [75.4, 30.0], duration: 1600 }); }
+  if (t === "dist") loadDistricts();
 }
 TABS.forEach((t) => $("#t-" + t).addEventListener("click", () => selectTab(t)));
 
@@ -834,9 +851,60 @@ $("#layers").addEventListener("change", (e) => {
   if (l === "terrain") map.setTerrain(layerOn.terrain && S.is3d ? { source: "dem", exaggeration: 2.2 } : null); else syncLayers();
 });
 function renderLegend() {
-  $("#legend").innerHTML = S.tab === "teams"
+  $("#legend").innerHTML = S.tab === "dist"
+    ? `<div class="lr"><span class="ramp"></span>season fire energy the count missed</div><div class="lr"><span class="ring" style="border-color:#FFF2DD;border-radius:3px"></span>selected district</div>`
+    : S.tab === "teams"
     ? `<div class="lr"><span class="col"></span>expected smoke harm tonight</div><div class="lr"><span class="ring" style="border-radius:3px"></span>team patrol block (~33 km)</div><div class="lr"><span class="dot"></span>fires that actually burned</div>`
     : `<div class="lr"><span class="ramp"></span>fire power (missed by the count)</div><div class="lr"><span class="ring"></span>already counted (zoom in)</div><div class="lr"><span class="haze"></span>farm smoke at ground level</div>`;
+}
+
+/* ---------- districts: what the official count showed vs the fire energy that burned ---------- */
+S.dyear = "2025";
+async function loadDistricts() {
+  if (!S.dist) {
+    try { S.dist = await getJSON("districts.json"); } catch (e) { $("#disthead").innerHTML = "<p>District data couldn't load.</p>"; return; }
+    map.addSource("dist", { type: "geojson", data: S.dist.geo, promoteId: "k" });
+    const before = map.getLayer("town-dot") ? "town-dot" : undefined;
+    map.addLayer({ id: "dist-fill", type: "fill", source: "dist", paint: { "fill-color": ["interpolate", ["linear"], ["coalesce", ["feature-state", "v"], 0], 0, "rgba(90,31,26,0.15)", 0.15, "#7A2A1C", 0.4, "#C9472A", 0.7, "#F28A3B", 1, "#FFD08A"], "fill-opacity": ["case", ["boolean", ["feature-state", "sel"], false], 0.92, 0.7] } }, before);
+    map.addLayer({ id: "dist-line", type: "line", source: "dist", paint: { "line-color": ["case", ["boolean", ["feature-state", "sel"], false], "#FFF2DD", "rgba(7,19,28,0.9)"], "line-width": ["case", ["boolean", ["feature-state", "sel"], false], 2.4, 1] } }, before);
+    map.addSource("dist-pt", { type: "geojson", data: geo(S.dist.districts.map((d, k) => pt(d.centre[0], d.centre[1], { name: d.name, k }))) });
+    map.addLayer({ id: "dist-l", type: "symbol", source: "dist-pt", minzoom: 6.4, layout: { "text-field": ["get", "name"], "text-font": ["Noto Sans Bold"], "text-size": 11, "text-padding": 4 }, paint: { "text-color": "#FFE6C7", "text-halo-color": "#07131C", "text-halo-width": 1.5 } });
+    map.on("click", "dist-fill", (e) => selectDistrict(e.features[0].properties.k, true));
+    map.on("mouseenter", "dist-fill", () => (map.getCanvas().style.cursor = "pointer")); map.on("mouseleave", "dist-fill", () => (map.getCanvas().style.cursor = ""));
+    document.querySelectorAll("#p-dist .seg button").forEach((b) => b.addEventListener("click", () => { S.dyear = b.dataset.y; document.querySelectorAll("#p-dist .seg button").forEach((x) => x.setAttribute("aria-pressed", x === b)); renderDistricts(); }));
+  }
+  syncLayers(); renderDistricts();
+  map.easeTo({ center: [75.6, 30.1], zoom: 6.85, pitch: 35, bearing: -8, duration: 1400 });
+}
+function renderDistricts() {
+  const D = S.dist.districts, y = S.dyear, key = "y" + y, maxE = Math.max(...D.map((d) => d[key].missed_energy_tj));
+  D.forEach((d, k) => map.setFeatureState({ source: "dist", id: k }, { v: Math.sqrt(d[key].missed_energy_tj / maxE) }));
+  const pctTxt = (x) => (x == null ? "–" : `${x > 0 ? "+" : ""}${Math.round(x * 100)}%`);
+  if (y === "2025") {
+    const fell = D.filter((d) => d.official_change < 0).length, rose = D.filter((d) => d.official_change < 0 && d.energy_change > 0).length;
+    $("#disthead").innerHTML = `<h3>Official counts fell in ${fell} of ${D.length} districts</h3><p>In <b>${rose}</b> of them, the fire energy GK-2A saw <b>rose</b>. The burning didn't stop; it moved after the satellites' 13:30 pass.</p>`;
+  } else {
+    const tot = D.reduce((a, d) => a + d.y2024.fire_energy_tj, 0), miss = D.reduce((a, d) => a + d.y2024.missed_energy_tj, 0);
+    $("#disthead").innerHTML = `<h3>${Math.round(miss / tot * 100)}% of the 2024 fire energy was missed by the count</h3><p>Across ${D.length} districts of Punjab and Haryana, ${Math.round(miss)} of ${Math.round(tot)} TJ came from fires that started after the 13:30 pass.</p>`;
+  }
+  // districts with real burning only (tiny totals make huge, meaningless percentages), biggest missed energy first
+  const rows = D.map((d, k) => ({ d, k })).filter(({ d }) => d.y2025.fire_energy_tj >= 3 && d.y2024.fire_energy_tj >= 3 && d.y2024.official_fires >= 20)
+    .sort((a, b) => b.d[key].missed_energy_tj - a.d[key].missed_energy_tj);
+  $("#dists").innerHTML = rows.slice(0, 25).map(({ d, k }, i) => `<li style="--i:${i}"><button class="row drow" type="button" data-k="${k}" aria-pressed="${S.distSel === k}">
+    <span class="t">${esc(d.name)} <span class="fine">${d.state}</span></span>
+    ${y === "2025" ? `<span class="chg ${d.official_change < 0 ? "down" : "up"}"><small>count</small>${pctTxt(d.official_change)}</span><span class="chg ${d.energy_change < 0 ? "down" : "up"}"><small>energy</small>${pctTxt(d.energy_change)}</span>`
+      : `<span class="chg up"><small>missed</small>${Math.round((d.y2024.missed_share || 0) * 100)}%</span><span class="chg down"><small>count</small>${d.y2024.official_fires}</span>`}
+    <span class="s">${d[key].official_fires} counted fires · ${d[key].fire_energy_tj} TJ seen by GK-2A · ${Math.round((d[key].missed_share || 0) * 100)}% after the pass</span></button></li>`).join("");
+  $("#dists").querySelectorAll(".row").forEach((b) => b.addEventListener("click", () => selectDistrict(+b.dataset.k, true)));
+}
+function selectDistrict(k, fly) {
+  if (S.distSel != null) map.setFeatureState({ source: "dist", id: S.distSel }, { sel: false });
+  S.distSel = k; map.setFeatureState({ source: "dist", id: k }, { sel: true }); renderDistricts();
+  const d = S.dist.districts[k], f = S.dist.geo.features[k], b = new maplibregl.LngLatBounds();
+  f.geometry.coordinates.forEach((poly) => poly[0].forEach((c) => b.extend(c)));
+  if (fly) map.fitBounds(b, { padding: 80, pitch: 45, maxZoom: 9.5, duration: 1600 });
+  const y = S.dyear, s = d["y" + y];
+  new maplibregl.Popup({ closeButton: false, offset: 10 }).setLngLat(d.centre).setHTML(`<div class="pop"><b>${esc(d.name)}, ${d.state}</b><div class="fine">${y}: ${s.official_fires} fires counted · ${s.fire_energy_tj} TJ seen by GK-2A · ${Math.round((s.missed_share || 0) * 100)}% started after the pass${y === "2025" ? `<br>vs 2024: count ${d.official_change > 0 ? "+" : ""}${Math.round(d.official_change * 100)}%, energy ${d.energy_change > 0 ? "+" : ""}${Math.round(d.energy_change * 100)}%` : ""}</div></div>`).addTo(map);
 }
 
 /* ---------- live pipeline status (CloudWatch via status.json) ---------- */
