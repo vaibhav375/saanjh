@@ -14,6 +14,8 @@ system that study calls for:
 3. **Follow the smoke.** Moves it with forecast winds through the boundary layer, which shrinks to tens of metres after sunset.
 4. **Act.** Ranks tonight's fires by how many people will breathe their smoke (for district officers) and
    tells each town when the smoke arrives (for schools), in English, Hindi and Punjabi.
+5. **Prevent.** At 11:30 IST, before the burning starts, predicts where tonight's fires are likely and places field
+   teams where they would avert the most smoke harm.
 
 ## What we measured (2024 season, details in [results/NOTES.md](results/NOTES.md))
 
@@ -29,6 +31,7 @@ system that study calls for:
 | Fire energy missed by the overpass, 2025 (held out) | **91.7%** of 729 TJ detected, with the detector frozen on 2024 |
 | Does it explain measured pollution? (2025 held out, CPCB stations) | Adding the missed fires to the existing overpass inventory raises the season's daily correlation with PM2.5 near the fires from 0.23 to 0.28 (+0.06, 95% CI +0.02 to +0.10); no change in Delhi |
 | GK-2A detection vs VIIRS at overpass, 2025 held out | 3% of fires under 5 MW, 24% at 20–40 MW, 43% at 40–80 MW (same curve as 2024); 70% of detections have a VIIRS fire within one pixel |
+| **Send teams before dusk** (2025 held out) | A noon plan placing 20 field teams by expected smoke harm covers **75%** of that evening's smoke harm, vs **31%** chasing the previous day's officially counted fires (fire-risk model ROC AUC 0.90) |
 | Does a night-before smoke warning beat "tomorrow will be like today"? | **Not meaningfully.** Persistence scores 0.370; persistence + Saanjh smoke 0.375. We report it; see results/NOTES.md |
 
 GK-2A sees Punjab from 66° off vertical, so its pixels are ~4 km and small fires are invisible to it.
@@ -58,6 +61,7 @@ matters: from a laptop in India each crop takes ~17 s to download; in us-east-1 
 | `saanjh/gk2a.py` | Reads the Punjab crop of a GK-2A scan by HTTP range request; CGMS geolocation; calibration |
 | `saanjh/detect.py` | Fire detector (contextual 3.8–11.2 µm anomaly, morning-normalised noise, cloud-edge and plains masks) and FRP |
 | `saanjh/smoke.py` | Lagrangian smoke model on ERA5 / forecast winds with residual-layer mixing; WorldPop exposure |
+| `saanjh/risk.py` | Tomorrow's fire risk (exported gradient-boosted trees, numpy-only) and the greedy team planner |
 | `saanjh/pipeline.py` | One evening end to end: fire events, counted vs missed, ranking, town arrival times, page JSON |
 | `saanjh/aws.py` | Lambda handlers (live SQS, day replay, hourly model, alerts, the page) |
 | `saanjh/agent.py` | "Ask Saanjh": a Strands Agents assistant on Amazon Bedrock that explains the ranking from the published data |

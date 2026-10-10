@@ -167,6 +167,14 @@ def site_handler(event, _ctx=None):
     path = event.get("rawPath", "/").lstrip("/") or "index.html"
     q = event.get("queryStringParameters") or {}
     try:
+        if path == "plan.json":
+            day = q.get("day", "")
+            if re.fullmatch(r"\d{4}-\d{2}-\d{2}", day):
+                body = s3.get_object(Bucket=BUCKET, Key=f"results/plan_{day.replace('-', '')}.json")["Body"].read()
+            else:
+                body = s3.get_object(Bucket=SITE, Key="plan.json")["Body"].read()
+            return dict(statusCode=200, headers={"Content-Type": TYPES[".json"], "Cache-Control": "max-age=60"},
+                        body=body.decode())
         if path == "tonight.json":
             day = q.get("day", "")
             if re.fullmatch(r"\d{4}-\d{2}-\d{2}", day):
@@ -185,3 +193,55 @@ def site_handler(event, _ctx=None):
     except s3.exceptions.NoSuchKey:
         pass
     return dict(statusCode=404, headers={"Content-Type": "text/plain"}, body="Not found")
+
+
+def _rain_cells(day):
+    """Rain (mm) on day-1 and day per risk cell, from the Open-Meteo forecast (which serves recent past days)."""
+    import requests
+    from saanjh import risk
+    lats, lons = np.arange(28.0, 33.01, 0.5), np.arange(73.5, 78.01, 0.5)
+    pts = np.array(np.meshgrid(lats, lons, indexing="ij")).reshape(2, -1).T
+    vals = []
+    for i in range(0, len(pts), 50):
+        q = pts[i:i + 50]
+        js = requests.get("https://api.open-meteo.com/v1/forecast", timeout=60, params=dict(
+            latitude=",".join(f"{x:.2f}" for x in q[:, 0]), longitude=",".join(f"{x:.2f}" for x in q[:, 1]),
+            daily="precipitation_sum", timezone="Asia/Kolkata", past_days=1, forecast_days=1)).json()
+        vals += [c["daily"]["precipitation_sum"][:2] for c in (js if isinstance(js, list) else [js])]
+    p = np.nan_to_num(np.array(vals, float)).reshape(len(lats), len(lons), 2)
+    clat, clon = risk.centres()
+    iy = np.clip(np.round((clat - lats[0]) / 0.5).astype(int), 0, len(lats) - 1)
+    ix = np.clip(np.round((clon - lons[0]) / 0.5).astype(int), 0, len(lons) - 1)
+    return p[iy, ix, 0], p[iy, ix, 1]
+
+
+def plan_handler(event, _ctx=None):
+    """Noon plan for tonight: where tonight's fires are likely and where K teams cover the most expected harm.
+    Uses only what is known at noon: GK-2A fires of the last 7 days, yesterday's VIIRS count, rain, last season."""
+    from saanjh import risk
+    day = (datetime.fromisoformat(event["day"]) if "day" in event else
+           (datetime.now(timezone.utc).replace(tzinfo=None) + pipeline.IST)).replace(hour=0, minute=0, second=0, microsecond=0)
+    lat, lon = gk2a.crop_grid()
+    hist = []
+    for k in range(1, 8):
+        det, _ = _detections(day - timedelta(days=k))
+        hist.append(risk.grid_sum(lat[det.i, det.j], lon[det.i, det.j], det.frp * 600) if len(det)
+                    else np.zeros((risk.NY, risk.NX)))
+    v = _viirs(day - timedelta(days=1), replay=False)
+    vg = risk.grid_sum(v.latitude, v.longitude) if v is not None and len(v) else np.zeros((risk.NY, risk.NX))
+    asset = lambda f: os.path.join(ASSETS, f)
+    mask, clim = np.load(asset("farmland_mask.npy")), np.load(asset("clim_2025.npy"))
+    models = (dict(np.load(asset("risk_model.npz"))), dict(np.load(asset("energy_model.npz"))))
+    X = risk.features(np.stack(hist), vg, clim, _rain_cells(day), (day - timedelta(days=1) - day.replace(month=10, day=15)).days,
+                      day.weekday())
+    met = smoke.Met.era5(day - timedelta(days=1), day + timedelta(days=2), forecast=True)
+    clat, clon = risk.centres()
+    t = smoke.hours_since(met, day + timedelta(hours=17 - 5.5))
+    _, expo = smoke.run(met, clat[mask], clon[mask], np.full(int(mask.sum()), t), np.ones(int(mask.sum())), hours=30, n_per=8)
+    pr, eh = np.zeros(mask.shape), np.zeros(mask.shape)
+    pr[mask] = risk.predict_proba(models[0], X[mask])
+    eh[mask] = risk.expected_harm(models, X[mask], expo)
+    body = risk.payload(day.date(), eh, pr)
+    body["generated"] = f"{datetime.now(timezone.utc):%Y-%m-%dT%H:%MZ}"
+    _put("plan.json", json.dumps(body, separators=(",", ":")), bucket=SITE)
+    return {"day": body["day"], "teams": len(body["teams"]), "top_share": body["teams"][0]["share"] if body["teams"] else 0}

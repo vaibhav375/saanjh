@@ -7,6 +7,7 @@ cp saanjh/*.py build/app/saanjh/
 mkdir -p build/app/site && cp site/index.html site/borders.json build/app/site/
 cp data/elevation_crop.npy build/app/saanjh/assets/
 cp data/pop/pop_grid.npy build/app/saanjh/assets/pop/
+cp saanjh/assets/*.npz saanjh/assets/*.npy build/app/saanjh/assets/  # risk models, farmland mask, last season
 .venv/bin/pip install -q --target build/layer/python --platform manylinux2014_aarch64 \
   --implementation cp --python-version 3.12 --only-binary=:all: \
   numpy scipy pandas h5py fsspec aiohttp certifi requests

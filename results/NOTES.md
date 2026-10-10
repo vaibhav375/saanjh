@@ -198,3 +198,31 @@ Alerts (Heidke skill, top-third mornings): persistence 0.370; persistence + hybr
 Tried and rejected: a 10-minute persistence rule (halved detection, no precision gain); a fitted MOS combination
 (unstable: early-October smoke is near zero at many stations, so its October-based standardisation blew up in
 November).
+
+## N6: tomorrow's fire risk and where to send teams (`scripts/build_risk.py`)
+
+0.1° cells (~11 km) over Punjab/Haryana farmland (1,135 cells with VIIRS fire in the two prior seasons). Features
+known by the evening of day d: GK-2A fire energy in the cell and its 5×5 / 9×9 neighbourhood over 1–7 days (the
+harvest-burning wave), yesterday's VIIRS count, last season's VIIRS count, rain on d and d+1, day of season,
+weekday. Two HistGradientBoosting models (P(fire tomorrow); expected energy if it burns), trained on 2024, tested on
+2025; trees exported to numpy (identical predictions, unit-tested) so the Lambda needs no scikit-learn.
+
+Prediction, 2025 held out (base rate 18% of cell-days burn): ROC AUC **0.90**, average precision **0.73**; yesterday's
+VIIRS count alone: 0.59 / 0.27.
+
+Team placement: K teams, each a 3×3-cell (~33 km) patrol block, greedy maximum coverage ((1 − 1/e)-optimal) of
+expected harm = P(fire) × expected energy × population exposure per kg released at 17:00 IST under that day's
+weather. The formula was chosen on a 2024-only split (first half train, second half validate) before the 2025 test.
+Share of next-evening smoke harm covered, 2025, energy-weighted over days [bootstrap 95% CI]:
+
+| Placement | 10 teams | 20 teams |
+| --- | --- | --- |
+| **Saanjh: expected harm** | **57%** [53–60] | **75%** [73–77] |
+| Saanjh: risk only | 48% | 68% |
+| Yesterday's GK-2A fires | 47% | 65% |
+| Last season's hotspots | 22% | 36% |
+| Chase yesterday's VIIRS (officially counted) fires | 16% | 31% |
+
+With the same 20 teams, Saanjh's noon plan covers 2.4× the evening's smoke harm that chasing yesterday's counted fires
+does. Most of that comes from seeing the evening fires at all; the model adds ~10 points over reusing yesterday's
+GK-2A fires. Caveat: harm weights used ERA5 (actual) weather; the live plan uses forecasts.

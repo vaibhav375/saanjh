@@ -69,7 +69,7 @@ svg#strip { display: block; width: 100%; height: 104px; cursor: ew-resize; }
 svg#strip text { font: 400 10.5px "Spline Sans Mono"; fill: #C9C6DA; }
 
 aside { background: var(--panel); border: 1px solid var(--rule); border-radius: 14px; overflow: hidden; }
-.tabs { display: grid; grid-template-columns: 1fr 1fr; border-bottom: 1px solid var(--rule); }
+.tabs { display: grid; grid-template-columns: 1fr 1fr 1fr; border-bottom: 1px solid var(--rule); }
 .tabs button { font: 600 15px/1.2 "Anek Latin"; font-stretch: 95%; padding: 14px 10px; border: 0; background: transparent; color: var(--muted); cursor: pointer; border-bottom: 3px solid transparent; }
 .tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--ink); }
 .pane { padding: 16px; }
@@ -113,6 +113,13 @@ button.link { background: none; border: 0; color: var(--focus); font: 500 13px "
 .ask button, .why button { font: 500 13px "Spline Sans Mono"; padding: 8px 12px; border-radius: 8px; border: 0; background: var(--ink); color: var(--panel); cursor: pointer; }
 .why button { margin-top: 10px; }
 #answer { margin: 10px 0 0; font-size: 15px; white-space: pre-wrap; }
+.slider label { display: block; font: 600 14px "Anek Latin"; margin-bottom: 4px; }
+.slider input { width: 100%; accent-color: var(--ember); }
+.planstat { font-size: 15px; margin: 10px 0; }
+.planstat b { font-weight: 700; }
+ol.teams { margin: 0; padding-left: 22px; font-size: 14px; max-height: 320px; overflow: auto; }
+ol.teams li { padding: 3px 0; border-bottom: 1px solid var(--rule); }
+ol.teams li span { font-family: "Spline Sans Mono"; font-size: 12px; color: var(--muted); float: right; }
 footer { margin-top: 28px; display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 18px; font-size: 14px; color: var(--muted); }
 footer h4 { margin: 0 0 4px; font: 600 14px "Anek Latin"; color: var(--ink); }
 footer p { margin: 0; }
@@ -133,7 +140,12 @@ footer a { color: inherit; }
       <div class="mapbox">
         <canvas id="map" width="900" height="660" aria-label="Map of Punjab and Haryana showing fires and drifting smoke"></canvas>
         <div class="clock"><div class="t" id="clock">--:--</div><div class="d" id="clockd"></div></div>
-        <div class="legend">
+        <div class="legend" id="legend-plan" hidden>
+          <span><i style="background:var(--ember)"></i>tonight's expected smoke harm</span>
+          <span><i style="background:#fff"></i>fires that actually burned (replays)</span>
+          <span><i style="background:var(--smoke)"></i>team patrol block</span>
+        </div>
+        <div class="legend" id="legend-main">
           <span><i style="background:var(--ember)"></i>missed by the official count</span>
           <span><i style="background:var(--straw)"></i>counted</span>
           <span><i style="background:var(--smoke)"></i>farm smoke at ground level</span>
@@ -153,11 +165,20 @@ footer a { color: inherit; }
       <div class="tabs" role="tablist">
         <button role="tab" id="t-res" aria-selected="true" aria-controls="p-res">When smoke reaches you</button>
         <button role="tab" id="t-off" aria-selected="false" aria-controls="p-off">Fires that matter tonight</button>
+        <button role="tab" id="t-plan" aria-selected="false" aria-controls="p-plan">Send teams before dusk</button>
       </div>
       <div class="pane" id="p-res" role="tabpanel" aria-labelledby="t-res">
         <p class="lede">Choose your town to see when farm-fire smoke is expected tonight and what schools can do.</p>
         <ul class="towns" id="towns"></ul>
         <div id="notice"></div>
+      </div>
+      <div class="pane" id="p-plan" role="tabpanel" aria-labelledby="t-plan" hidden>
+        <p class="lede">Made at 11:30 IST, before the burning starts. Each block is a ~33 km patrol area placed where tonight's fires are likely <em>and</em> their smoke would reach the most people.</p>
+        <div class="slider"><label for="teams">Field teams available: <b id="teamsn">20</b></label>
+          <input type="range" id="teams" min="1" max="30" value="20"></div>
+        <p class="planstat" id="planstat"></p>
+        <ol class="teams" id="teamlist"></ol>
+        <p class="more">How well this works: on the held-out 2025 season, 20 teams placed this way covered 75% of the next evening's smoke harm, against 31% when teams chase the previous day's officially counted fires.</p>
       </div>
       <div class="pane" id="p-off" role="tabpanel" aria-labelledby="t-off" hidden>
         <p class="lede">Fires Saanjh saw this afternoon and evening, ranked by how much smoke each puts into people's air over the next day, not by size. Send field teams and residue machines to the top of this list.</p>
@@ -246,13 +267,14 @@ function draw() {
   }
   sc.putImageData(img, 0, 0);
   ctx.imageSmoothingEnabled = true;
-  ctx.drawImage(smokeCv, px(g.lon0), py(g.lat0 + g.ny * g.d), px(g.lon0 + g.nx * g.d) - px(g.lon0), py(g.lat0) - py(g.lat0 + g.ny * g.d));
+  if (S.tab !== "plan") ctx.drawImage(smokeCv, px(g.lon0), py(g.lat0 + g.ny * g.d), px(g.lon0 + g.nx * g.d) - px(g.lon0), py(g.lat0) - py(g.lat0 + g.ny * g.d));
   // borders
   ctx.lineWidth = 1;
   for (const r of S.borders) {
     ctx.strokeStyle = r.c === "PAK" ? "rgba(201,198,218,.18)" : "rgba(201,198,218,.34)";
     ctx.beginPath(); r.p.forEach(([x, y], i) => i ? ctx.lineTo(px(x), py(y)) : ctx.moveTo(px(x), py(y))); ctx.stroke();
   }
+  if (S.tab === "plan") { drawPlan(); drawTowns(); drawPlayhead(); return; }
   // fires the official count already has (VIIRS overpass), small and quiet
   ctx.fillStyle = "rgba(214,169,63,.55)";
   for (const [la, lo] of (d.counted_cells || [])) { ctx.beginPath(); ctx.arc(px(lo), py(la), 2.2, 0, 7); ctx.fill(); }
@@ -266,18 +288,20 @@ function draw() {
     if (S.fire === i) { ctx.globalAlpha = 1; ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(px(fr.lon), py(fr.lat), r + 5, 0, 7); ctx.stroke(); }
   });
   ctx.globalAlpha = 1;
-  // towns
+  drawTowns();
+  $("#clock").textContent = fmtIST(now);
+  $("#clockd").textContent = dayIST(now) + " IST";
+  drawPlayhead();
+}
+function drawTowns() {
   ctx.font = "500 12px 'Spline Sans Mono', monospace";
-  for (const t of d.towns) {
+  for (const t of S.d.towns) {
     const [la, lo] = TOWNS[t.town] || []; if (!la) continue;
     const sel = S.town === t.town;
     ctx.fillStyle = sel ? "#fff" : "rgba(233,231,243,.85)";
     ctx.beginPath(); ctx.arc(px(lo), py(la), sel ? 4 : 2.5, 0, 7); ctx.fill();
     if (sel || t.peak_ugm3 >= 10 || ["Delhi", "Ludhiana", "Amritsar", "Chandigarh"].includes(t.town)) ctx.fillText(t.town, px(lo) + 6, py(la) - 5);
   }
-  $("#clock").textContent = fmtIST(now);
-  $("#clockd").textContent = dayIST(now) + " IST";
-  drawPlayhead();
 }
 const TOWNS = { Delhi: [28.61, 77.21], Gurugram: [28.46, 77.03], Noida: [28.54, 77.39], Ghaziabad: [28.67, 77.45], Faridabad: [28.41, 77.32], Meerut: [28.98, 77.71], Sonipat: [28.99, 77.02], Panipat: [29.39, 76.97], Karnal: [29.69, 76.99], Rohtak: [28.89, 76.61], Hisar: [29.15, 75.72], Sirsa: [29.53, 75.03], Ambala: [30.38, 76.78], Chandigarh: [30.73, 76.78], Patiala: [30.34, 76.39], Sangrur: [30.25, 75.84], Ludhiana: [30.90, 75.85], Jalandhar: [31.33, 75.58], Amritsar: [31.63, 74.87], Moga: [30.82, 75.17], Bathinda: [30.21, 74.95], Ferozepur: [30.93, 74.61], Muktsar: [30.47, 74.52], Fazilka: [30.40, 74.03], "Fatehabad": [29.52, 75.45], "Ratia": [29.69, 75.58], "Tohana": [29.71, 75.9], "Mansa": [29.99, 75.4], "Barnala": [30.38, 75.55], "Kaithal": [29.8, 76.4], "Jind": [29.32, 76.31], "Tarn Taran": [31.45, 74.93], "Kapurthala": [31.38, 75.38], "Faridkot": [30.67, 74.76], "Abohar": [30.14, 74.2], "Malerkotla": [30.53, 75.88], "Gurdaspur": [32.04, 75.4], "Hoshiarpur": [31.53, 75.91], "Rupnagar": [30.97, 76.53], "Kurukshetra": [29.97, 76.85], "Yamunanagar": [30.13, 77.27], "Bhiwani": [28.79, 76.13], "Ellenabad": [29.45, 74.66], "Talwandi Sabo": [29.98, 75.08] };
 function firstSeenMs(fr) { const [h, m] = fr.first_ist.split(":").map(Number); return Date.parse(S.d.day + "T00:00Z") + (h * 60 + m) * 60e3 - IST; }
@@ -426,12 +450,83 @@ async function ask(params) {
 }
 $("#askform").addEventListener("submit", (e) => { e.preventDefault(); const q = $("#askq").value.trim(); if (q) ask({ q }); });
 
+/* ---------- send teams before dusk (noon plan) ---------- */
+let PLAN = null;
+fetch("plan.json" + location.search).then(r => r.ok ? r.json() : null).then(p => { PLAN = p; renderPlan(); }).catch(() => {});
+function planGreedy(score, ny, nx, k) {  // maximum coverage with 3x3 blocks; mirrors saanjh/risk.py plan()
+  const s = Float64Array.from(score), picks = [];
+  for (let t = 0; t < k; t++) {
+    let best = -1, br = 0, bc = 0;
+    for (let r = 0; r < ny; r++) for (let c = 0; c < nx; c++) {
+      let g = 0;
+      for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+        const rr = r + dr, cc = c + dc; if (rr >= 0 && rr < ny && cc >= 0 && cc < nx) g += s[rr * nx + cc];
+      }
+      if (g > best) { best = g; br = r; bc = c; }
+    }
+    if (best <= 0) break;
+    picks.push([br, bc, best]);
+    for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+      const rr = br + dr, cc = bc + dc; if (rr >= 0 && rr < ny && cc >= 0 && cc < nx) s[rr * nx + cc] = 0;
+    }
+  }
+  return picks;
+}
+function renderPlan() {
+  const k = +$("#teams").value; $("#teamsn").textContent = k;
+  if (!PLAN) { $("#planstat").textContent = "No plan for this day yet. Plans are made at 11:30 IST; replays exist for the 2025 test season (try ?day=2025-11-10)."; $("#teamlist").innerHTML = ""; return; }
+  const g = PLAN.grid, eh = PLAN.expected_harm, tot = eh.reduce((a, b) => a + b, 0);
+  S.planPicks = planGreedy(eh, g.ny, g.nx, k);
+  const share = S.planPicks.reduce((a, p) => a + p[2], 0) / tot;
+  let line = `These <b>${k}</b> teams cover <b>${Math.round(share * 100)}%</b> of tonight's expected farm-smoke harm.`;
+  if (PLAN.actual_energy) {
+    const act = PLAN.actual_energy.map(v => Math.expm1(v / 100)), atot = act.reduce((a, b) => a + b, 0);
+    const cov = new Set(); for (const [r, c] of S.planPicks) for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) cov.add((r + dr) * g.nx + c + dc);
+    let hit = 0; cov.forEach(i => { if (i >= 0 && i < act.length) hit += act[i]; });
+    line += ` That evening, their blocks held <b>${Math.round(hit / atot * 100)}%</b> of the fire energy GK-2A actually saw.`;
+  }
+  $("#planstat").innerHTML = line;
+  $("#teamlist").innerHTML = S.planPicks.map(([r, c, gain]) => {
+    const la = g.lat0 + (r + .5) * g.d, lo = g.lon0 + (c + .5) * g.d;
+    const [name, [tla, tlo]] = Object.entries(TOWNS).reduce((b, e) => ((e[1][0] - la) ** 2 + (e[1][1] - lo) ** 2 < (b[1][0] - la) ** 2 + (b[1][1] - lo) ** 2 ? e : b));
+    const km = Math.hypot((tla - la) * 111, (tlo - lo) * 96);
+    return `<li>Around ${km < 6 ? name : `${Math.round(km)} km from ${name}`}<span>${(gain / tot * 100).toFixed(1)}%</span></li>`;
+  }).join("");
+  if (S.tab === "plan") draw();
+}
+function drawPlan() {
+  if (!PLAN) return;
+  const g = PLAN.grid;
+  for (let r = 0; r < g.ny; r++) for (let c = 0; c < g.nx; c++) {
+    const v = PLAN.expected_harm[r * g.nx + c] / 1000; if (v <= 0.002) continue;
+    ctx.fillStyle = `rgba(238,90,36,${Math.min(.9, .18 + Math.sqrt(v) * 1.1)})`;
+    const x0 = px(g.lon0 + c * g.d), y0 = py(g.lat0 + (r + 1) * g.d);
+    ctx.fillRect(x0, y0, px(g.lon0 + (c + 1) * g.d) - x0, py(g.lat0 + r * g.d) - y0);
+  }
+  if (PLAN.actual_energy) {
+    ctx.fillStyle = "rgba(255,255,255,.75)";
+    for (let r = 0; r < g.ny; r++) for (let c = 0; c < g.nx; c++) {
+      const v = PLAN.actual_energy[r * g.nx + c]; if (v <= 0) continue;
+      ctx.beginPath(); ctx.arc(px(g.lon0 + (c + .5) * g.d), py(g.lat0 + (r + .5) * g.d), 0.8 + v / 900, 0, 7); ctx.fill();
+    }
+  }
+  ctx.lineWidth = 2; ctx.font = "700 12px 'Spline Sans Mono', monospace";
+  (S.planPicks || []).forEach(([r, c], i) => {
+    const x0 = px(g.lon0 + (c - 1) * g.d), y0 = py(g.lat0 + (r + 2) * g.d), x1 = px(g.lon0 + (c + 2) * g.d), y1 = py(g.lat0 + (r - 1) * g.d);
+    ctx.strokeStyle = "#B9A7D6"; ctx.strokeRect(x0, y0, x1 - x0, y1 - y0);
+    ctx.fillStyle = "#fff"; ctx.fillText(String(i + 1), x0 + 3, y0 + 13);
+  });
+}
+$("#teams").addEventListener("input", renderPlan);
+
 /* ---------- tabs ---------- */
 function selectTab(which) {
-  for (const t of ["res", "off"]) { $("#t-" + t).setAttribute("aria-selected", t === which); $("#p-" + t).hidden = t !== which; }
+  for (const t of ["res", "off", "plan"]) { $("#t-" + t).setAttribute("aria-selected", t === which); $("#p-" + t).hidden = t !== which; }
+  S.tab = which; $("#legend-plan").hidden = which !== "plan"; $("#legend-main").hidden = which === "plan"; draw();
 }
 $("#t-res").addEventListener("click", () => selectTab("res"));
 $("#t-off").addEventListener("click", () => selectTab("off"));
+$("#t-plan").addEventListener("click", () => selectTab("plan"));
 </script>
 </body>
 </html>

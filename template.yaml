@@ -109,6 +109,23 @@ Resources:
             # 12:35 IST to 00:35 IST, every hour
             ScheduleExpression: cron(35 7-19 * * ? *)
 
+  # Noon plan: tonight's fire risk and where to send field teams, before the 16:00 IST burning starts.
+  PlanFn:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: saanjh.aws.plan_handler
+      Layers: [!Ref Deps]
+      MemorySize: 3008
+      Timeout: 600
+      Policies:
+        - S3CrudPolicy: {BucketName: !Ref DataBucket}
+        - S3CrudPolicy: {BucketName: !Ref SiteBucket}
+      Events:
+        Noon:
+          Type: ScheduleV2
+          Properties:
+            ScheduleExpression: cron(0 6 * * ? *)  # 11:30 IST
+
   AlertTopic:
     Type: AWS::SNS::Topic
   AlertEmailSub:
