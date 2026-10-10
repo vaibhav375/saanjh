@@ -1,6 +1,8 @@
 """One evening, end to end: GK-2A scans -> fire events -> smoke -> ranked fires and town alerts."""
 import base64
 import json
+import os
+import unicodedata
 from datetime import datetime, timedelta, timezone
 
 import numpy as np
@@ -99,6 +101,37 @@ def fire_events(day, step_min=60, viirs=None, detections=None):
     return ev
 
 
+_RINGS = None
+
+
+def state_of(lat, lon):
+    """State/province name per point (ray casting over the geoBoundaries rings bundled for the map)."""
+    global _RINGS
+    if _RINGS is None:
+        path = os.path.join(os.path.dirname(__file__), "..", "site", "borders.json")
+        plain = lambda t: unicodedata.normalize("NFKD", t).encode("ascii", "ignore").decode()
+        _RINGS = [(plain(r["name"]) + (" (Pakistan)" if r["c"] == "PAK" and r["name"] == "Punjab" else
+                                       " (India)" if r["name"] == "Punjab" else ""), np.array(r["p"], float))
+                  for r in json.load(open(path))]
+    lat, lon = np.asarray(lat, float), np.asarray(lon, float)
+    out = np.full(lat.shape, "other areas", dtype=object)
+    for name, ring in _RINGS:
+        x0, y0 = ring[:, 0], ring[:, 1]
+        x1, y1 = np.roll(x0, -1), np.roll(y0, -1)
+        crosses = ((y0[None] > lat[:, None]) != (y1[None] > lat[:, None])) & (
+            lon[:, None] < (x1 - x0)[None] * (lat[:, None] - y0[None]) / np.where(y1 == y0, 1e-12, y1 - y0)[None] + x0[None])
+        inside = crosses.sum(1) % 2 == 1
+        out[inside & (out == "other areas")] = name
+    return out
+
+
+def _nearest_town(lat, lon):
+    names = list(TOWNS)
+    tl = np.array([TOWNS[n] for n in names])
+    k = np.argmin((tl[None, :, 0] - np.asarray(lat)[:, None]) ** 2 + (tl[None, :, 1] - np.asarray(lon)[:, None]) ** 2, 1)
+    return np.array(names, dtype=object)[k]
+
+
 def overpass_sources(day, viirs):
     """The inventory forecasts use today: VIIRS fires summed on the 0.05 deg model grid, released 09:00-19:00
     IST with a midday-peaked profile (Gaussian, peak 13:30 IST, sigma 2 h). Returns one row per grid cell
@@ -143,9 +176,24 @@ def tonight(day, met, events, hours=30, viirs=None):
         src = events.assign(source="GK-2A").reset_index(drop=True)
         rel = _gk2a_releases(src)
     t_h = np.array([smoke.hours_since(met, pd.Timestamp(t).to_pydatetime()) for t in rel.t])
-    conc, expo = smoke.run(met, src.lat.to_numpy()[rel.row], src.lon.to_numpy()[rel.row], t_h,
-                           rel.kg.to_numpy(), hours=hours, n_per=30)
+    names = list(TOWNS)
+    cells = [(int((TOWNS[n][0] - smoke.LAT0) / smoke.D), int((TOWNS[n][1] - smoke.LON0) / smoke.D)) for n in names]
+    conc, expo, dose = smoke.run(met, src.lat.to_numpy()[rel.row], src.lon.to_numpy()[rel.row], t_h,
+                                 rel.kg.to_numpy(), hours=hours, n_per=30, receptors=cells)
     src["harm"] = pd.Series(expo).groupby(rel.row.to_numpy()).sum().reindex(src.index, fill_value=0.0)
+    # Where each town's smoke comes from: exact within the (linear) model, by state and by nearby district town.
+    per_src = pd.DataFrame(dose, columns=names).groupby(rel.row.to_numpy()).sum().reindex(src.index, fill_value=0.0)
+    state, near = state_of(src.lat, src.lon), _nearest_town(src.lat, src.lon)
+    origins = {}
+    for n in names:
+        tot = per_src[n].sum()
+        if tot <= 0:
+            continue
+        by_state = per_src[n].groupby(state).sum().sort_values(ascending=False) / tot
+        area = pd.Series([f"near {a}, {st}" for a, st in zip(near, state)], index=src.index)
+        by_area = per_src[n].groupby(area.to_numpy()).sum().sort_values(ascending=False) / tot
+        origins[n] = dict(from_states=[dict(name=k, share=round(float(v), 3)) for k, v in by_state.items() if v >= 0.01],
+                          from_areas=[dict(name=k, share=round(float(v), 3)) for k, v in by_area.head(5).items()])
     src = src.sort_values("harm", ascending=False)
     t0 = met.t0 + timedelta(hours=float(t_h.min()))
     towns = []
@@ -153,7 +201,7 @@ def tonight(day, met, events, hours=30, viirs=None):
         series = conc[:, int((la - smoke.LAT0) / smoke.D), int((lo - smoke.LON0) / smoke.D)]
         k_peak = int(series.argmax())
         over = np.nonzero(series > 0.25 * series.max())[0] if series.max() > 0 else []
-        towns.append(dict(town=name, lat=la, lon=lo, peak_ugm3=series.max(), peak_ist=f"{t0 + timedelta(hours=k_peak) + IST:%a %H:%M}",
+        towns.append(dict(town=name, lat=la, lon=lo, **origins.get(name, {}), peak_ugm3=series.max(), peak_ist=f"{t0 + timedelta(hours=k_peak) + IST:%a %H:%M}",
                           arrives_ist=f"{t0 + timedelta(hours=int(over[0])) + IST:%a %H:%M}" if len(over) else ""))
     return src, pd.DataFrame(towns).sort_values("peak_ugm3", ascending=False), conc, t0
 

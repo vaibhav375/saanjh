@@ -124,7 +124,7 @@ class Met:
 
 
 def run(met: Met, lat, lon, t_rel, mass_kg, hours=36, n_per=40, dt_min=15, seed=0,
-        out_every_h=1, h_min=H_MIN):
+        out_every_h=1, h_min=H_MIN, receptors=None):
     """Release n_per particles per source (t_rel in hours since met.t0) and follow each for `hours`.
 
     Returns (conc, src_exposure): conc[k, y, x] ground PM2.5 (ug/m3) at output step k (hourly from
@@ -144,6 +144,12 @@ def run(met: Met, lat, lon, t_rel, mass_kg, hours=36, n_per=40, dt_min=15, seed=
     n_out = int(np.ceil((t_end - t_start) / out_every_h)) + 1
     conc = np.zeros((n_out, NY, NX))
     expo = np.zeros(len(lat))
+    # Optional receptor cells [(iy, ix), ...]: per-source smoke dose there (ug/m3 * h), exact by linearity.
+    rec_of = np.full((NY, NX), -1)
+    if receptors is not None:
+        for k, (ry, rx) in enumerate(receptors):
+            rec_of[ry, rx] = k
+    dose = np.zeros((len(lat), 0 if receptors is None else len(receptors)))
     sig = np.sqrt(2 * K_H * dt_s)
     gone = np.zeros(len(m), bool)  # left the model area: no population there, and winds are extrapolated
     for k in range(steps + 1):
@@ -156,6 +162,10 @@ def run(met: Met, lat, lon, t_rel, mass_kg, hours=36, n_per=40, dt_min=15, seed=
             c = m[live][ok] * np.exp(-(t - trel[live][ok]) / TAU_H) / (area[iy[ok], ix[ok]] * hp[live][ok])
             np.add.at(conc[int(round((t - t_start) / out_every_h))], (iy[ok], ix[ok]), c)
             np.add.at(expo, src[live][ok], c * pop[iy[ok], ix[ok]] * out_every_h)
+            if receptors is not None:
+                rid = rec_of[iy[ok], ix[ok]]
+                at = rid >= 0
+                np.add.at(dose, (src[live][ok][at], rid[at]), c[at] * out_every_h)
         if not live.any():
             continue
         la, lo = plat[live], plon[live]
@@ -169,7 +179,7 @@ def run(met: Met, lat, lon, t_rel, mass_kg, hours=36, n_per=40, dt_min=15, seed=
         gone[live] = ~((la > LAT0) & (la < LAT0 + NY * D) & (lo > LON0) & (lo < LON0 + NX * D))
         _, _, blh = met.at(np.full(la.shape, t + dt_h), la, lo)
         hp[live] = np.maximum(hp[live], blh)
-    return conc, expo
+    return (conc, expo, dose) if receptors is not None else (conc, expo)
 
 
 def hours_since(met: Met, t: datetime):

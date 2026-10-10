@@ -120,6 +120,13 @@ button.link { background: none; border: 0; color: var(--focus); font: 500 13px "
 ol.teams { margin: 0; padding-left: 22px; font-size: 14px; max-height: 320px; overflow: auto; }
 ol.teams li { padding: 3px 0; border-bottom: 1px solid var(--rule); }
 ol.teams li span { font-family: "Spline Sans Mono"; font-size: 12px; color: var(--muted); float: right; }
+.origin { margin-top: 12px; }
+.origin h4 { margin: 0 0 6px; font: 600 14px "Anek Latin"; }
+.obar { display: flex; height: 14px; border-radius: 7px; overflow: hidden; background: var(--rule); }
+.obar span { display: block; height: 100%; }
+.okey { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 6px 0; font: 400 12px "Spline Sans Mono"; color: var(--muted); }
+.okey i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+.origin ol { margin: 4px 0 0; padding-left: 20px; font-size: 14px; }
 footer { margin-top: 28px; display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 18px; font-size: 14px; color: var(--muted); }
 footer h4 { margin: 0 0 4px; font: 600 14px "Anek Latin"; color: var(--ink); }
 footer p { margin: 0; }
@@ -397,6 +404,15 @@ const MSG = {  // says what the evidence supports: where and when farm smoke goe
   hi: (t) => `${t.town} की ओर आज रात पराली का धुआँ आ रहा है। यह लगभग ${t.arrives_ist.slice(-5)} बजे पहुँचेगा और ${t.peak_ist.slice(-5)} के आसपास सबसे ज़्यादा होगा। कल सुबह की प्रार्थना सभा से पहले PM2.5 देखें; 90 से ऊपर हो तो सभा अंदर करें।`,
   pa: (t) => `${t.town} ਵੱਲ ਅੱਜ ਰਾਤ ਪਰਾਲੀ ਦਾ ਧੂੰਆਂ ਆ ਰਿਹਾ ਹੈ। ਇਹ ਲਗਭਗ ${t.arrives_ist.slice(-5)} ਵਜੇ ਪਹੁੰਚੇਗਾ ਅਤੇ ${t.peak_ist.slice(-5)} ਦੇ ਨੇੜੇ ਸਭ ਤੋਂ ਵੱਧ ਹੋਵੇਗਾ। ਕੱਲ੍ਹ ਸਵੇਰ ਦੀ ਸਭਾ ਤੋਂ ਪਹਿਲਾਂ PM2.5 ਵੇਖੋ; 90 ਤੋਂ ਵੱਧ ਹੋਵੇ ਤਾਂ ਸਭਾ ਅੰਦਰ ਕਰੋ।`,
 };
+const STATE_COLOURS = { "Punjab (India)": "#EE5A24", "Haryana": "#D6A93F", "Punjab (Pakistan)": "#B9A7D6", "Rajasthan": "#7FA87A", "Delhi": "#6F8FD8", "Uttar Pradesh": "#C77DA8", "Himachal Pradesh": "#8AB8C7" };
+function originHTML(t) {  // where this town's farm smoke comes from tonight (exact split within the smoke model)
+  if (!t.from_states || !t.from_states.length) return "";
+  const col = (n) => STATE_COLOURS[n] || "#8E8A85";
+  return `<div class="origin"><h4>Where tonight's farm smoke here comes from</h4>
+    <div class="obar">${t.from_states.map(s => `<span style="width:${s.share * 100}%;background:${col(s.name)}" title="${s.name} ${Math.round(s.share * 100)}%"></span>`).join("")}</div>
+    <div class="okey">${t.from_states.map(s => `<span><i style="background:${col(s.name)}"></i>${s.name} ${Math.round(s.share * 100)}%</span>`).join("")}</div>
+    <ol>${t.from_areas.slice(0, 3).map(a => `<li>Fires ${a.name}: ${Math.round(a.share * 100)}%</li>`).join("")}</ol></div>`;
+}
 function renderNotice() {
   const t = S.town && S.d.towns.find(t => t.town === S.town);
   if (!t) { $("#notice").innerHTML = ""; return; }
@@ -405,7 +421,8 @@ function renderNotice() {
   $("#notice").innerHTML = `<div class="notice" style="border-left-color:var(--${lv})"><h3>${t.town}: ${lv === "alert" ? "heavy farm smoke heading here tonight" : "farm smoke expected tonight"}</h3>
     <div class="langs">${["en", "hi", "pa"].map(l => `<button type="button" data-l="${l}" aria-pressed="${S.lang === l}">${{ en: "English", hi: "हिन्दी", pa: "ਪੰਜਾਬੀ" }[l]}</button>`).join("")}</div>
     <p class="msg" lang="${S.lang}">${MSG[S.lang](t)}</p>
-    <p class="more">Farm smoke adds up to ~${t.peak_ugm3.toFixed(0)} µg/m³ PM2.5 at its peak (model estimate) · alerts go out above 25</p></div>`;
+    <p class="more">Farm smoke adds up to ~${t.peak_ugm3.toFixed(0)} µg/m³ PM2.5 at its peak (model estimate) · alerts go out above 25</p>
+    ${originHTML(t)}</div>`;
   $("#notice").querySelectorAll(".langs button").forEach(b => b.addEventListener("click", () => { S.lang = b.dataset.l; renderNotice(); }));
 }
 
