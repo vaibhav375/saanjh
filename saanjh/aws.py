@@ -33,6 +33,16 @@ ALERT_UGM3 = float(os.environ.get("ALERT_UGM3", "25"))
 KEY_RE = re.compile(r"gk2a_ami_le1b_(sw038|ir112)_fd020ge_(\d{12})\.nc")
 
 
+def metric(stage="live", **values):
+    """Publish custom CloudWatch metrics with the Embedded Metric Format: one structured log line, no API call.
+    values: name=(value, unit)."""
+    import time as _t
+    print(json.dumps({"_aws": {"Timestamp": int(_t.time() * 1000), "CloudWatchMetrics": [{
+        "Namespace": "Saanjh", "Dimensions": [["Stage"]],
+        "Metrics": [{"Name": k, "Unit": u} for k, (_, u) in values.items()]}]},
+        "Stage": stage, **{k: v for k, (v, _) in values.items()}}))
+
+
 def read_scan(band, t):
     """Crop of one scan straight from NOAA's bucket (same region, so ~1 s); None if missing."""
     try:
@@ -81,7 +91,15 @@ def detect_handler(event, _ctx=None):
         for r in msg.get("Records", []):
             m = KEY_RE.search(r["s3"]["object"]["key"])
             if m:  # either band may land first; the second one's message does the work
-                done += _detect(datetime.strptime(m.group(2), "%Y%m%d%H%M")) is not None
+                import time as _t
+                t = datetime.strptime(m.group(2), "%Y%m%d%H%M")
+                t0 = _t.time()
+                d = _detect(t)
+                if d is not None:
+                    done += 1
+                    lag = (datetime.now(timezone.utc).replace(tzinfo=None) - t).total_seconds()
+                    metric(ScansProcessed=(1, "Count"), Detections=(len(d), "Count"),
+                           ScanLatency=(lag, "Seconds"), ProcessSeconds=(_t.time() - t0, "Seconds"))
     return {"processed": done}
 
 
@@ -133,6 +151,8 @@ def model_handler(event, _ctx=None):
     else:
         _put("tonight.json", body, bucket=SITE)
         _alert(day, towns)
+        metric(ModelRuns=(1, "Count"), FireEvents=(len(ev), "Count"),
+               AlertTowns=(int((towns.peak_ugm3 >= ALERT_UGM3).sum()), "Count"))
     return {"day": out["day"], **out["stats"]}
 
 
@@ -183,6 +203,9 @@ def site_handler(event, _ctx=None):
                 body = s3.get_object(Bucket=SITE, Key="tonight.json")["Body"].read()
             return dict(statusCode=200, headers={"Content-Type": TYPES[".json"], "Cache-Control": "max-age=60"},
                         body=body.decode())
+        if path == "status.json":
+            return dict(statusCode=200, headers={"Content-Type": TYPES[".json"], "Cache-Control": "max-age=60"},
+                        body=json.dumps(_status()))
         if path == "days.json":  # replay days available, for the date picker
             keys = [o["Key"] for p in s3.get_paginator("list_objects_v2").paginate(Bucket=BUCKET, Prefix="results/")
                     for o in p.get("Contents", [])]
@@ -252,4 +275,50 @@ def plan_handler(event, _ctx=None):
     body = risk.payload(day.date(), eh, pr)
     body["generated"] = f"{datetime.now(timezone.utc):%Y-%m-%dT%H:%MZ}"
     _put("plan.json", json.dumps(body, separators=(",", ":")), bucket=SITE)
+    metric(PlanRuns=(1, "Count"))
     return {"day": body["day"], "teams": len(body["teams"]), "top_share": body["teams"][0]["share"] if body["teams"] else 0}
+
+
+_STATUS = {"at": 0, "body": None}
+
+
+def _status():
+    """Live pipeline health for the page: last image processed, throughput, latency, errors, alarms, cost."""
+    import time as _t
+    if _t.time() - _STATUS["at"] < 60 and _STATUS["body"]:
+        return _STATUS["body"]
+    cw = boto3.client("cloudwatch")
+    now = datetime.now(timezone.utc)
+    q = lambda i, ns, name, stat, dims, period=86400, start=timedelta(days=1): dict(
+        Id=i, MetricStat=dict(Metric=dict(Namespace=ns, MetricName=name, Dimensions=[dict(Name=k, Value=v) for k, v in dims.items()]),
+                              Period=period, Stat=stat), ReturnData=True)
+    fns = {k: os.environ.get(k, "") for k in ("DETECT_FN", "MODEL_FN", "PLAN_FN", "AGENT_FN")}
+    queries = [q("scans", "Saanjh", "ScansProcessed", "Sum", {"Stage": "live"}),
+               q("dets", "Saanjh", "Detections", "Sum", {"Stage": "live"}),
+               q("lat", "Saanjh", "ScanLatency", "p50", {"Stage": "live"}, 3 * 3600),
+               q("proc", "Saanjh", "ProcessSeconds", "p50", {"Stage": "live"})]
+    for k, fn in fns.items():
+        if fn:
+            queries += [q(f"err_{k.lower()}", "AWS/Lambda", "Errors", "Sum", {"FunctionName": fn}),
+                        q(f"dur_{k.lower()}", "AWS/Lambda", "Duration", "Sum", {"FunctionName": fn}),
+                        q(f"inv_{k.lower()}", "AWS/Lambda", "Invocations", "Sum", {"FunctionName": fn})]
+    res = cw.get_metric_data(MetricDataQueries=queries, StartTime=now - timedelta(days=1), EndTime=now)
+    val = {r["Id"]: (r["Values"][0] if r["Values"] else 0.0) for r in res["MetricDataResults"]}
+    mem = {"DETECT_FN": 2048, "MODEL_FN": 3008, "PLAN_FN": 3008, "AGENT_FN": 512}
+    gbs = sum(val.get(f"dur_{k.lower()}", 0) / 1000 * mem[k] / 1024 for k in fns)
+    keys = [o for d in (now - timedelta(days=1), now) for p in s3.get_paginator("list_objects_v2").paginate(
+            Bucket=BUCKET, Prefix=f"detections/{d:%Y%m%d}/") for o in p.get("Contents", [])]
+    recent = [o for o in keys if o["LastModified"] > now - timedelta(days=1)]
+    last = max((o["Key"] for o in keys), default=None)
+    alarms = cw.describe_alarms(AlarmNamePrefix="saanjh-")["MetricAlarms"]
+    body = dict(
+        generated=f"{now:%Y-%m-%dT%H:%MZ}",
+        last_image=f"{last[11:15]}-{last[15:17]}-{last[17:19]}T{last[20:22]}:{last[22:24]}:00Z" if last else None,
+        images_24h=max(int(val["scans"]), len(recent)), detections_24h=int(val["dets"]),
+        latency_p50_min=round(val["lat"] / 60, 1), process_p50_s=round(val["proc"], 1),
+        invocations_24h=int(sum(val.get(f"inv_{k.lower()}", 0) for k in fns)),
+        errors_24h=int(sum(val.get(f"err_{k.lower()}", 0) for k in fns)),
+        lambda_cost_24h_usd=round(gbs * 0.0000133334 + val.get("inv_detect_fn", 0) * 2e-7, 3),
+        alarms=[dict(name=a["AlarmName"].replace("saanjh-", ""), state=a["StateValue"]) for a in alarms])
+    _STATUS.update(at=_t.time(), body=body)
+    return body

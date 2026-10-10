@@ -43,6 +43,32 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .glass { background: var(--glass); backdrop-filter: blur(18px) saturate(1.3); -webkit-backdrop-filter: blur(18px) saturate(1.3);
   border: 1px solid var(--rule); border-radius: var(--r); box-shadow: var(--shadow); }
 
+.sys { height: 54px; display: flex; align-items: center; gap: 10px; padding: 0 14px; font: 500 12.5px var(--text); white-space: nowrap; flex: none; }
+.sys i { width: 8px; height: 8px; border-radius: 50%; background: var(--ink-3); flex: none; }
+.sys i.ok { background: #6BD39A; box-shadow: 0 0 10px rgba(107,211,154,.6); }
+.sys i.warn { background: var(--watch); } .sys i.bad { background: var(--alert); animation: ping 1.6s infinite; }
+.sys span { color: var(--ink-2); } .sys b { font-weight: 600; color: var(--ink); }
+.syspop { position: fixed; top: 76px; z-index: 6; width: 380px; padding: 16px; display: none; }
+.syspop.open { display: block; animation: rise .25s var(--ease); }
+.syspop h4 { margin: 0 0 2px; font: 700 15px var(--display); font-stretch: 108%; }
+.sgrid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1px; background: var(--rule); border-radius: 10px; overflow: hidden; margin: 12px 0; }
+.sgrid div { background: var(--night-1); padding: 10px 12px; }
+.sgrid b { display: block; font: 700 20px/1.1 var(--display); font-stretch: 108%; font-variant-numeric: tabular-nums; }
+.sgrid span { font: 400 11px/1.3 var(--text); color: var(--ink-3); }
+.alarms { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.alarms li { display: flex; justify-content: space-between; font: 400 12px var(--mono); color: var(--ink-2); }
+.alarms li b { font-weight: 600; } .alarms .OK { color: #6BD39A; } .alarms .ALARM { color: var(--alert); } .alarms .INSUFFICIENT_DATA { color: var(--ink-3); }
+.arch { margin-top: 30px; padding: 20px; border-radius: 16px; border: 1px solid var(--rule); background: rgba(18, 41, 58, .45); }
+.arch h3 { margin: 0 0 4px; font: 700 20px var(--display); font-stretch: 108%; }
+.arch svg { width: 100%; height: auto; display: block; margin-top: 12px; }
+.arch .node rect { fill: var(--night-2); stroke: var(--rule-hi); }
+.arch .node.aws rect { stroke: rgba(244,162,89,.55); }
+.arch .node text { font: 600 12px var(--text); fill: var(--ink); }
+.arch .node text.sub { font: 400 10.5px var(--mono); fill: var(--ink-3); }
+.arch .wire { fill: none; stroke: rgba(150,196,222,.28); stroke-width: 1.5; }
+.arch .flow { fill: #FFD08A; }
+.arch .grp { fill: none; stroke: rgba(150,196,222,.16); stroke-dasharray: 4 4; }
+.arch .grpl { font: 500 10.5px var(--mono); fill: var(--ink-3); letter-spacing: .08em; text-transform: uppercase; }
 /* top bar */
 .top { position: fixed; top: 14px; left: 14px; right: 14px; display: flex; gap: 10px; align-items: center; z-index: 5; pointer-events: none; }
 .top > * { pointer-events: auto; }
@@ -230,6 +256,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   body:not(.force-desktop) .top { flex-wrap: wrap; top: 10px; left: 10px; right: 10px; }
   body:not(.force-desktop) .brand p { display: none; }
   body:not(.force-desktop) .search { display: none; }
+  body:not(.force-desktop) .sys span { display: none; } body:not(.force-desktop) .sys { height: 48px; } body:not(.force-desktop) .syspop { width: auto; left: 10px !important; right: 10px; top: 66px; }
   body:not(.force-desktop) .brand { height: 48px; } body:not(.force-desktop) .daypick { height: 48px; flex: 1; } body:not(.force-desktop) .btn-ev { height: 48px; }
   body:not(.force-desktop) .btn-ev span { display: none; } body:not(.force-desktop) .btn-ev { padding: 0 14px; }
   body:not(.force-desktop) .daypick label { display: none; } body:not(.force-desktop) .daypick select { max-width: 120px; }
@@ -260,6 +287,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     <label for="day">Night</label>
     <select id="day" aria-label="Choose the night"></select>
   </div>
+  <button class="sys glass" id="sys" type="button" aria-haspopup="dialog" aria-expanded="false"><i id="sysdot"></i><span id="systxt">Pipeline · checking</span></button>
   <div class="search glass">
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
     <input id="q" list="townlist" placeholder="Find a town — Ludhiana, Delhi, Sirsa…" autocomplete="off" aria-label="Find a town">
@@ -347,7 +375,19 @@ button { font: inherit; color: inherit; cursor: pointer; }
     <h2 id="ev-h">How we know it works</h2>
     <p class="lede">Every image GK-2A took of Punjab and Haryana, 15 Oct – 30 Nov, in 2024 and 2025. Methods were tuned on 2024 and tested on 2025, a season they never saw — including the one place where Saanjh doesn't help.</p>
     <div class="ev-grid" id="ev-grid"></div>
+    <section class="arch" aria-labelledby="arch-h">
+      <h3 id="arch-h">How it runs on AWS</h3>
+      <p class="fine">Event-driven and serverless, in us-east-1 next to NOAA's GK-2A bucket. The same Lambdas serve the live system and replay whole seasons.</p>
+      <svg id="archsvg" viewBox="0 0 1120 430" role="img" aria-label="Architecture: NOAA S3 and SNS to SQS and Lambda detection, Step Functions replays, EventBridge schedules, smoke model and plan Lambdas, S3, Function URLs, SNS alerts, Bedrock agent, CloudWatch"></svg>
+    </section>
   </div>
+</div>
+<div class="syspop glass" id="syspop" role="dialog" aria-label="Live pipeline">
+  <h4>Live pipeline on AWS</h4>
+  <div class="fine" id="sysgen">Last 24 hours · CloudWatch</div>
+  <div class="sgrid" id="sgrid"></div>
+  <ul class="alarms" id="alarms"></ul>
+  <p class="fine" style="margin:12px 0 0">Every GK-2A image triggers NOAA's SNS topic → SQS → Lambda. Failed images go to a dead-letter queue; alarms page the operator by email.</p>
 </div>
 <div class="toast glass" id="toast" role="status"></div>
 
@@ -799,10 +839,53 @@ function renderLegend() {
     : `<div class="lr"><span class="ramp"></span>fire power (missed by the count)</div><div class="lr"><span class="ring"></span>already counted (zoom in)</div><div class="lr"><span class="haze"></span>farm smoke at ground level</div>`;
 }
 
+/* ---------- live pipeline status (CloudWatch via status.json) ---------- */
+function ago(iso) { if (!iso) return "no image yet today"; const m = Math.round((Date.now() - Date.parse(iso)) / 60000); return m < 1 ? "just now" : m < 60 ? `${m} min ago` : `${Math.round(m / 60)} h ago`; }
+async function pollStatus() {
+  try {
+    const st = await getJSON("status.json"), bad = st.alarms.some((a) => a.state === "ALARM");
+    const fresh = st.last_image && Date.now() - Date.parse(st.last_image) < 45 * 60000;
+    $("#sysdot").className = bad ? "bad" : fresh ? "ok" : "warn";
+    $("#systxt").innerHTML = bad ? "<b>Pipeline alarm</b>" : `<b>Pipeline live</b> <span>· last image ${ago(st.last_image)}</span>`;
+    $("#sgrid").innerHTML = [[st.images_24h.toLocaleString("en-IN"), "GK-2A images processed"], [st.detections_24h.toLocaleString("en-IN"), "fire detections"],
+      [st.latency_p50_min ? `${st.latency_p50_min} min` : "–", "image taken → on the map (median)"], [st.process_p50_s ? `${st.process_p50_s} s` : "–", "Lambda time per image"],
+      [st.invocations_24h.toLocaleString("en-IN"), "Lambda invocations"], [`$${st.lambda_cost_24h_usd.toFixed(2)}`, "Lambda compute cost"]].map(([b, t]) => `<div><b>${b}</b><span>${t}</span></div>`).join("");
+    $("#alarms").innerHTML = st.alarms.map((a) => `<li>${esc(a.name)}<b class="${a.state}">${a.state === "INSUFFICIENT_DATA" ? "quiet" : a.state}</b></li>`).join("");
+    $("#sysgen").textContent = `Last 24 hours · CloudWatch · updated ${fmtIST(Date.parse(st.generated))} IST`;
+  } catch (e) { $("#sysdot").className = "warn"; $("#systxt").innerHTML = "<b>Replay</b> <span>· live status unavailable</span>"; }
+}
+pollStatus(); setInterval(pollStatus, 60000);
+$("#sys").addEventListener("click", () => { const p = $("#syspop"), o = p.classList.toggle("open"); $("#sys").setAttribute("aria-expanded", o); const r = $("#sys").getBoundingClientRect(); p.style.left = Math.min(r.left, innerWidth - 394) + "px"; });
+
+/* ---------- architecture diagram (animated data flow) ---------- */
+function buildArch() {
+  const N = [ // id, x, y, w, title, subtitle, aws?
+    ["noaa", 20, 40, 170, "NOAA GK-2A bucket", "S3 · every 10 min", 1], ["sns", 230, 40, 150, "NewGK2AObject", "SNS (NOAA's topic)", 1],
+    ["sqs", 420, 40, 150, "Live queue", "SQS + dead-letter queue", 1], ["det", 610, 40, 170, "Detect fires", "Lambda · 4 MB range read", 1],
+    ["s3", 830, 40, 170, "Detections, results", "S3", 1],
+    ["sfn", 420, 170, 150, "Season replays", "Step Functions Map", 1], ["ebh", 20, 170, 170, "Hourly + noon", "EventBridge Scheduler", 1],
+    ["model", 610, 170, 170, "Smoke model, ensemble", "Lambda · hourly", 1], ["plan", 230, 170, 150, "Noon team plan", "Lambda · 11:30 IST", 1],
+    ["site", 830, 170, 170, "This page + API", "Lambda Function URL", 1], ["alert", 830, 300, 170, "Smoke alerts", "SNS → email", 1],
+    ["agent", 610, 300, 170, "Ask Saanjh", "Strands agent", 1], ["bedrock", 420, 300, 150, "Qwen3 235B", "Amazon Bedrock", 1],
+    ["cw", 20, 300, 170, "Metrics, alarms", "CloudWatch", 1], ["met", 230, 300, 150, "Weather, PM2.5", "Open-Meteo · OpenAQ", 0]];
+  const W = 52, pos = Object.fromEntries(N.map(([id, x, y, w]) => [id, { x, y, w, cx: x + w / 2, cy: y + W / 2 }]));
+  const E = [["noaa", "sns"], ["sns", "sqs"], ["sqs", "det"], ["det", "s3"], ["ebh", "plan"], ["ebh", "model", 1], ["sfn", "det", 1], ["sfn", "model"], ["s3", "model", 1], ["model", "site"], ["model", "alert"], ["plan", "site", 1], ["site", "agent", 1], ["agent", "bedrock"], ["met", "model", 1], ["det", "cw", 1]];
+  const edge = (a, b) => { const p = pos[a], q = pos[b]; const x1 = p.cx < q.cx ? p.x + p.w : p.cx > q.cx ? p.x : p.cx, x2 = p.cx < q.cx ? q.x : p.cx > q.cx ? q.x + q.w : q.cx;
+    const y1 = p.cy, y2 = q.cy; if (p.cy === q.cy) return `M${x1},${y1} L${x2},${y2}`; const sx = p.cx === q.cx ? p.cx : x1, ex = p.cx === q.cx ? q.cx : x2, sy = p.cy < q.cy ? p.y + W : p.y, ey = p.cy < q.cy ? q.y : q.y + W;
+    return p.cx === q.cx ? `M${sx},${sy} L${ex},${ey}` : `M${p.cx},${sy} C${p.cx},${(sy + ey) / 2} ${q.cx},${(sy + ey) / 2} ${q.cx},${ey}`; };
+  let g = `<rect class="grp" x="8" y="22" width="1004" height="88" rx="14"/><text class="grpl" x="20" y="16">live · event-driven</text>
+    <rect class="grp" x="8" y="152" width="1004" height="88" rx="14"/><text class="grpl" x="20" y="146">scheduled · replays</text>
+    <rect class="grp" x="8" y="282" width="1004" height="88" rx="14"/><text class="grpl" x="20" y="276">explain · alert · observe</text>`;
+  E.forEach(([a, b], i) => { const d = edge(a, b); g += `<path id="w${i}" class="wire" d="${d}"/>` + (reduceMotion ? "" : `<circle class="flow" r="3.2"><animateMotion dur="${2.2 + (i % 4) * 0.5}s" repeatCount="indefinite" begin="${(i * 0.37) % 2}s"><mpath href="#w${i}"/></animateMotion></circle>`); });
+  N.forEach(([id, x, y, w, t, sub, aws]) => (g += `<g class="node ${aws ? "aws" : ""}"><rect x="${x}" y="${y}" width="${w}" height="${W}" rx="10"/><text x="${x + 12}" y="${y + 22}">${t}</text><text class="sub" x="${x + 12}" y="${y + 39}">${sub}</text></g>`));
+  g += `<text class="grpl" x="1030" y="70">AWS SAM</text><text class="grpl" x="1030" y="86">IaC, all</text><text class="grpl" x="1030" y="102">of it</text>`;
+  $("#archsvg").innerHTML = g;
+}
+
 /* ---------- evidence ---------- */
-$("#open-ev").addEventListener("click", () => { $("#sheet").classList.add("open"); if (!S.ev) getJSON("evidence.json").then((E) => { S.ev = E; renderEvidence(E); }).catch(() => ($("#ev-grid").innerHTML = "<p class='lede'>The evidence couldn't load. Try again in a moment.</p>")); $("#close-ev").focus(); });
+$("#open-ev").addEventListener("click", () => { $("#sheet").classList.add("open"); if (!$("#archsvg").innerHTML) buildArch(); if (!S.ev) getJSON("evidence.json").then((E) => { S.ev = E; renderEvidence(E); }).catch(() => ($("#ev-grid").innerHTML = "<p class='lede'>The evidence couldn't load. Try again in a moment.</p>")); $("#close-ev").focus(); });
 $("#close-ev").addEventListener("click", () => $("#sheet").classList.remove("open"));
-addEventListener("keydown", (e) => { if (e.key === "Escape") { $("#sheet").classList.remove("open"); $("#layers").classList.remove("open"); } });
+addEventListener("keydown", (e) => { if (e.key === "Escape") { $("#sheet").classList.remove("open"); $("#layers").classList.remove("open"); $("#syspop").classList.remove("open"); } });
 const pct = (x) => `${Math.round(x * 100)}%`;
 function table(head, rows) { return `<details><summary>Show the numbers</summary><table><thead><tr>${head.map((h) => `<th>${esc(h)}</th>`).join("")}</tr></thead><tbody>${rows.map((r) => `<tr>${r.map((c) => `<td>${esc(c)}</td>`).join("")}</tr>`).join("")}</tbody></table></details>`; }
 function card(i, title, body, cap, extra = "", cls = "") { return `<article class="ev ${cls}" style="--i:${i}"><h3>${title}</h3>${body}<p class="cap">${cap}</p>${extra}</article>`; }
