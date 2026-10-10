@@ -75,7 +75,7 @@ It is a large-fire detector, and the numbers below are about the energy it can s
 
 The page shows tonight's fires and smoke on a map, with a time strip painted in the colours of the sky it covers,
 marking the satellite pass and when each fire was first seen. District officers get the fires ranked by the people
-who will breathe their smoke, and can ask an assistant (Strands Agents with Claude on Amazon Bedrock, read-only tools)
+who will breathe their smoke, and can ask an assistant (Strands Agents with open-weight Qwen3 on Amazon Bedrock, read-only tools)
 why a fire ranks where it does. Residents pick their town and get a notice in English, Hindi or Punjabi. Saanjh works
 on a 2–4 km grid and never identifies farmers.
 

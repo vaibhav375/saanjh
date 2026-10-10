@@ -10,4 +10,5 @@ matplotlib
 requests
 pytest
 moto[s3,sns]
-strands-agents
+strands-agents[openai]
+aws-bedrock-token-generator

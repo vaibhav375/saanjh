@@ -1,4 +1,7 @@
-"""Ask Saanjh: a Strands agent (Claude on Amazon Bedrock) that explains tonight's ranking from the data.
+"""Ask Saanjh: a Strands agent on Amazon Bedrock that explains tonight's ranking from the data.
+
+The model is an open-weight one served by Bedrock's OpenAI-compatible Mantle endpoint (Qwen3 235B by default):
+on the AWS Free plan those are the models with inference quota, and Bedrock bills them to the account's credits.
 
 Function URL: GET ?q=<question>[&rank=<n>][&day=YYYY-MM-DD]. The agent can only read: the published
 night (tonight.json or a replayed day), a town's smoke timing, the live CPCB PM2.5 reading near a town
@@ -11,9 +14,9 @@ import re
 import boto3
 import requests
 from strands import Agent, tool
-from strands.models import BedrockModel
+from strands.models.openai import OpenAIModel
 
-MODEL_ID = os.environ.get("AGENT_MODEL_ID", "us.anthropic.claude-haiku-5-5")
+MODEL_ID = os.environ.get("AGENT_MODEL_ID", "qwen.qwen3-235b-a22b-2507")
 s3 = boto3.client("s3")
 _night = {}
 
@@ -31,8 +34,10 @@ Rankings are by modelled population exposure (people x hours x ug/m3) over the n
 
 SYSTEM = """You are Saanjh's assistant for district officers and school staff in Punjab and Haryana.
 Answer only from your tools. Be brief (at most 5 sentences), concrete and plain; give numbers with units.
+The ranking is by share of modelled population exposure (people x hours x smoke), not by size or emissions.
 When asked why a fire ranks where it does, call get_fire and explain from its timing, size, location and share
 of exposure, and mention that evening smoke is trapped in a shallow night-time layer if relevant.
+Never compare a fire with others ("highest", "largest") unless you have called get_fire for those others too.
 Never identify or speculate about individual farmers or plots; the grid is 2-4 km. If the data cannot answer,
 say so. Model smoke values are estimates of the farm-fire share only, not total pollution."""
 
@@ -108,8 +113,9 @@ def make_agent(day=None):
         """What Saanjh has measured about evening fires, detection limits, the dusk penalty and validation."""
         return FINDINGS
 
-    return Agent(model=BedrockModel(model_id=MODEL_ID, region_name=os.environ.get("AWS_REGION", "us-east-1"),
-                                    max_tokens=400),
+    model = OpenAIModel(bedrock_mantle_config={"region": os.environ.get("AWS_REGION", "us-east-1")},
+                        model_id=MODEL_ID, params={"max_tokens": 400, "temperature": 0.2})
+    return Agent(model=model,
                  system_prompt=SYSTEM, tools=[get_fire, get_night_summary, get_town, get_station_pm25,
                                               get_research_findings], callback_handler=None)
 

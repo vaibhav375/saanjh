@@ -30,7 +30,7 @@ Measured (details and caveats in `results/NOTES.md`):
   ~25 minutes (a day of downloads from a laptop in India).
 - **Hourly model and alerts:** EventBridge Scheduler → Lambda → S3 → SNS email alerts.
 - **Public page:** Lambda Function URL (HTTPS).
-- **Assistant:** Strands Agents SDK with Claude on Amazon Bedrock, read-only tools.
+- **Assistant:** Strands Agents SDK with open-weight Qwen3 on Amazon Bedrock (Mantle endpoint), read-only tools.
 - **Infrastructure as code:** AWS SAM. AWS open-source tools used: AWS SAM CLI, Strands Agents SDK.
 
 ## AI tools used

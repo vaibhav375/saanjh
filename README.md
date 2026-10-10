@@ -45,7 +45,7 @@ EventBridge Scheduler (hourly, 12:35–00:35 IST) ──▶ Lambda: fire events 
 Step Functions Map (8 days in parallel) ──▶ the same Lambdas over NOAA's archive  →  season replays
 ```
 
-An "Ask Saanjh" assistant (Strands Agents SDK, Claude on Amazon Bedrock) answers officers' questions such as
+An "Ask Saanjh" assistant (Strands Agents SDK, open-weight Qwen3 on Amazon Bedrock via its OpenAI-compatible Mantle endpoint) answers officers' questions such as
 "why is fire #3 ranked third?" using four read-only tools over the published night and live CPCB readings.
 
 Everything is in [template.yaml](template.yaml) (AWS SAM). The Lambdas run next to NOAA's bucket, which

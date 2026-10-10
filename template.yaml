@@ -184,7 +184,8 @@ Resources:
       CompatibleRuntimes: [python3.12]
       CompatibleArchitectures: [arm64]
 
-  # "Ask Saanjh": a Strands agent on Bedrock that explains tonight's ranking from the published data.
+  # "Ask Saanjh": a Strands agent on Bedrock (open-weight Qwen3 via the Mantle endpoint, Free-plan friendly)
+  # that explains tonight's ranking from the published data.
   AgentFn:
     Type: AWS::Serverless::Function
     Properties:
@@ -195,12 +196,14 @@ Resources:
       Environment:
         Variables:
           OPENAQ_API_KEY: !Ref OpenAqApiKey
+          AGENT_MODEL_ID: qwen.qwen3-235b-a22b-2507
       Policies:
         - S3ReadPolicy: {BucketName: !Ref SiteBucket}
         - S3ReadPolicy: {BucketName: !Ref DataBucket}
         - Statement:
+            # Bedrock's OpenAI-compatible (Mantle) endpoint, via short-term tokens minted from this role.
             - Effect: Allow
-              Action: [bedrock:InvokeModel, bedrock:InvokeModelWithResponseStream]
+              Action: [bedrock-mantle:CreateInference, bedrock-mantle:CallWithBearerToken]
               Resource: "*"
       FunctionUrlConfig:
         AuthType: NONE
