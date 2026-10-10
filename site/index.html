@@ -16,7 +16,9 @@
   --rule: #CFCDD6;
   --night: #141A33;      /* map sky */
   --night-ink: #C9C6DA;
-  --straw: #D6A93F;      /* counted by the polar satellites */
+  --straw: #D6A93F;      /* daylight in the night strip */
+  --official: #2F6FB0;   /* the official count / status quo (validated vs ember, light surface) */
+  --c-ember: #C8461A;    /* Saanjh / fires the count missed, for charts on the light surface */
   --ember: #EE5A24;      /* missed by them */
   --smoke: #B9A7D6;
   --alert: #B4231C;
@@ -26,12 +28,12 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --page: #111018; --panel: #1A1922; --ink: #ECEAF2; --muted: #A29FB0; --rule: #2E2C39;
-    --alert: #FF6B5E; --watch: #E7A84A; --focus: #8EA2FF;
+    --alert: #FF6B5E; --watch: #E7A84A; --focus: #8EA2FF; --official: #4E8FD0; --c-ember: #EE5A24;
   }
 }
 :root[data-theme="dark"] {
   --page: #111018; --panel: #1A1922; --ink: #ECEAF2; --muted: #A29FB0; --rule: #2E2C39;
-  --alert: #FF6B5E; --watch: #E7A84A; --focus: #8EA2FF;
+  --alert: #FF6B5E; --watch: #E7A84A; --focus: #8EA2FF; --official: #4E8FD0; --c-ember: #EE5A24;
 }
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--page); color: var(--ink); font: 400 16px/1.5 Mukta, system-ui, sans-serif; }
@@ -101,7 +103,7 @@ td.num { font-family: "Spline Sans Mono"; font-size: 13px; text-align: right; }
 tbody tr { cursor: pointer; }
 tbody tr:hover, tbody tr[aria-selected="true"] { background: color-mix(in srgb, var(--smoke) 20%, transparent); }
 .rec { font: 500 11px/1 "Spline Sans Mono"; padding: 3px 6px; border-radius: 4px; }
-.rec.missed { background: var(--ember); color: #fff; } .rec.counted { background: var(--straw); color: #1C1B22; }
+.rec.missed { background: var(--ember); color: #fff; } .rec.counted { background: var(--official); color: #fff; }
 .why { margin: 12px 0 0; padding: 12px; background: var(--page); border-radius: 10px; font-size: 15px; }
 .why b { font-weight: 700; }
 button.link { background: none; border: 0; color: var(--focus); font: 500 13px "Spline Sans Mono"; cursor: pointer; padding: 10px 0 0; }
@@ -127,6 +129,23 @@ ol.teams li span { font-family: "Spline Sans Mono"; font-size: 12px; color: var(
 .okey { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 6px 0; font: 400 12px "Spline Sans Mono"; color: var(--muted); }
 .okey i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
 .origin ol { margin: 4px 0 0; padding-left: 20px; font-size: 14px; }
+.evidence { margin-top: 32px; }
+.evidence h2 { margin: 0 0 4px; font: 760 30px/1.1 "Anek Latin"; font-stretch: 85%; }
+.ev-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; margin-top: 14px; }
+.ev { background: var(--panel); border: 1px solid var(--rule); border-radius: 14px; padding: 16px; }
+.ev h3 { margin: 0 0 2px; font: 700 18px/1.2 "Anek Latin"; }
+.ev .cap { margin: 8px 0 0; font-size: 13px; color: var(--muted); }
+.ev svg { display: block; width: 100%; height: auto; margin-top: 8px; overflow: visible; }
+.ev svg text { font: 400 11px "Spline Sans Mono"; fill: var(--muted); }
+.ev svg .val { fill: var(--ink); font-weight: 500; }
+.ev svg .mark:hover { opacity: .75; }
+.ev .key { display: flex; gap: 14px; flex-wrap: wrap; font: 400 12px "Spline Sans Mono"; color: var(--muted); margin-top: 6px; }
+.ev .key i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+.ev details { margin-top: 8px; font-size: 13px; }
+.ev details summary { cursor: pointer; color: var(--muted); font: 400 12px "Spline Sans Mono"; }
+.ev details table td, .ev details table th { padding: 3px 6px; font-size: 12px; }
+.ev.neg { border-left: 4px solid var(--muted); }
+.ev .big { font: 760 44px/1 "Anek Latin"; font-stretch: 80%; color: var(--c-ember); }
 footer { margin-top: 28px; display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 18px; font-size: 14px; color: var(--muted); }
 footer h4 { margin: 0 0 4px; font: 600 14px "Anek Latin"; color: var(--ink); }
 footer p { margin: 0; }
@@ -154,7 +173,7 @@ footer a { color: inherit; }
         </div>
         <div class="legend" id="legend-main">
           <span><i style="background:var(--ember)"></i>missed by the official count</span>
-          <span><i style="background:var(--straw)"></i>counted</span>
+          <span><i style="background:#4E8FD0"></i>counted</span>
           <span><i style="background:var(--smoke)"></i>farm smoke at ground level</span>
         </div>
         <div class="tip" id="tip"></div>
@@ -204,6 +223,12 @@ footer a { color: inherit; }
       </div>
     </aside>
   </main>
+
+  <section class="evidence" aria-labelledby="ev-h">
+    <h2 id="ev-h">How we know it works</h2>
+    <p class="lede">Measured on two full seasons of GK-2A images replayed on AWS. Methods were tuned on 2024 and tested on 2025, which the methods never saw.</p>
+    <div class="ev-grid" id="ev-grid"></div>
+  </section>
 
   <footer>
     <div><h4>How this works</h4><p>Every 10 minutes the Korean GK-2A satellite images Punjab and Haryana. Saanjh finds fires in each image, follows their smoke with forecast winds and the height of the night-time air layer, and adds it up over where people live.</p></div>
@@ -283,14 +308,14 @@ function draw() {
   }
   if (S.tab === "plan") { drawPlan(); drawTowns(); drawPlayhead(); return; }
   // fires the official count already has (VIIRS overpass), small and quiet
-  ctx.fillStyle = "rgba(214,169,63,.55)";
+  ctx.fillStyle = "rgba(78,143,208,.6)";
   for (const [la, lo] of (d.counted_cells || [])) { ctx.beginPath(); ctx.arc(px(lo), py(la), 2.2, 0, 7); ctx.fill(); }
   // fires: lit only once first seen at the current frame time
   const now = frameTime(S.frame), tot = d.stats.harm_total;
   d.fires.forEach((fr, i) => {
     const lit = firstSeenMs(fr) <= now, r = 3 + Math.sqrt(fr.harm / tot) * 34;
     ctx.globalAlpha = lit ? 1 : .22;
-    ctx.fillStyle = fr.counted ? "#D6A93F" : "#EE5A24";
+    ctx.fillStyle = fr.counted ? "#4E8FD0" : "#EE5A24";
     ctx.beginPath(); ctx.arc(px(fr.lon), py(fr.lat), r, 0, 7); ctx.fill();
     if (S.fire === i) { ctx.globalAlpha = 1; ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(px(fr.lon), py(fr.lat), r + 5, 0, 7); ctx.stroke(); }
   });
@@ -351,7 +376,7 @@ function buildStrip() {
   }
   // where the polar satellites pass
   const pass = Date.parse(S.d.day + "T08:00Z"), kp = (pass - t0) / 3600e3;
-  if (kp >= 0) s += `<line x1="${xk(kp)}" x2="${xk(kp)}" y1="2" y2="${bandY + bandH + 4}" stroke="#D6A93F" stroke-width="1.5" stroke-dasharray="3 3"/><text x="${xk(kp) + 5}" y="10" style="fill:#D6A93F">satellites pass ${fmtIST(pass)}</text>`;
+  if (kp >= 0) s += `<line x1="${xk(kp)}" x2="${xk(kp)}" y1="2" y2="${bandY + bandH + 4}" stroke="#4E8FD0" stroke-width="1.5" stroke-dasharray="3 3"/><text x="${xk(kp) + 5}" y="10" style="fill:#8DB8E8">satellites pass ${fmtIST(pass)}</text>`;
   // hour labels
   for (let k = 0; k < n; k += 3) s += `<text x="${xk(k)}" y="${h - 8}" text-anchor="${k ? "middle" : "start"}">${fmtIST(frameTime(k))}</text>`;
   if (S.town) { const t = S.d.towns.find(t => t.town === S.town); const k = kFromLabel(t.arrives_ist); if (k >= 0) s += `<path d="M${xk(k)} ${bandY + bandH + 2} l-5 8 h10z" fill="#B9A7D6"/><text x="${xk(k) + 8}" y="${bandY + bandH + 10}" style="fill:#B9A7D6">smoke reaches ${S.town}</text>`; }
@@ -535,6 +560,112 @@ function drawPlan() {
   });
 }
 $("#teams").addEventListener("input", renderPlan);
+
+/* ---------- evidence ---------- */
+fetch("evidence.json").then(r => r.json()).then(renderEvidence).catch(() => {});
+const esc = (x) => String(x).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const pct = (x) => `${Math.round(x * 100)}%`;
+function table(head, rows) {
+  return `<details><summary>Show the numbers</summary><table><thead><tr>${head.map(h => `<th>${esc(h)}</th>`).join("")}</tr></thead><tbody>${rows.map(r => `<tr>${r.map(c => `<td>${esc(c)}</td>`).join("")}</tr>`).join("")}</tbody></table></details>`;
+}
+function card(title, body, cap, extra = "", cls = "") {
+  return `<article class="ev ${cls}"><h3>${title}</h3>${body}<p class="cap">${cap}</p>${extra}</article>`;
+}
+function renderEvidence(E) {
+  const W = 460, cards = [];
+  // 1. season: daily fire energy, counted (bottom) vs missed (top)
+  {
+    const d = E.season.days, H = 170, pl = 34, pb = 22, max = Math.max(...d.map(x => x.missed_tj + x.counted_tj));
+    const bw = (W - pl) / d.length, y = (v) => (H - pb) - v / max * (H - pb - 6);
+    let g = `<line x1="${pl}" x2="${W}" y1="${H - pb}" y2="${H - pb}" stroke="var(--rule)"/>`;
+    [0, Math.round(max / 2), Math.round(max)].forEach(t => g += `<text x="${pl - 6}" y="${y(t) + 4}" text-anchor="end">${t}</text>`);
+    d.forEach((x, i) => {
+      const x0 = pl + i * bw + 1, w = Math.max(1, bw - 2), yc = y(x.counted_tj), ym = y(x.counted_tj + x.missed_tj);
+      g += `<g class="mark"><title>${x.day}: ${x.missed_tj} TJ missed, ${x.counted_tj} TJ counted</title>
+        <rect x="${x0}" y="${yc}" width="${w}" height="${H - pb - yc}" fill="var(--official)"/>
+        <rect x="${x0}" y="${ym}" width="${w}" height="${Math.max(0, yc - ym - 1)}" fill="var(--c-ember)" rx="1.5"/></g>`;
+      if (i % 10 === 0) g += `<text x="${x0}" y="${H - 6}">${x.day.slice(5)}</text>`;
+    });
+    cards.push(card(`<span class="big">${pct(E.season.missed_share)}</span><br>of the fire energy came after the satellites passed`,
+      `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Daily fire energy in 2025, mostly from fires the count missed">${g}</svg>
+       <div class="key"><span><i style="background:var(--c-ember)"></i>started after the overpass (missed)</span><span><i style="background:var(--official)"></i>burning at the overpass</span></div>`,
+      `Fire radiative energy GK-2A detected per day (TJ), Punjab + Haryana, 2025 (held out). 2024: ${pct(E.season.missed_share_2024)}.`,
+      table(["day", "missed TJ", "counted TJ"], E.season.days.map(x => [x.day, x.missed_tj, x.counted_tj]))));
+  }
+  // 2. dusk penalty: daily ratios as a dot strip, reference at 1x
+  {
+    const d = E.dusk["200"].days, H = 120, pl = 10, max = 6.5, x = (v) => pl + v / max * (W - pl - 10);
+    let g = `<line x1="${x(1)}" x2="${x(1)}" y1="10" y2="${H - 26}" stroke="var(--muted)" stroke-dasharray="3 3"/><text x="${x(1) + 4}" y="18">same harm</text>`;
+    [0, 1, 2, 3, 4, 5, 6].forEach(t => g += `<text x="${x(t)}" y="${H - 8}" text-anchor="middle">${t}×</text>`);
+    d.forEach((p, i) => g += `<circle class="mark" cx="${x(p.ratio)}" cy="${30 + (i % 7) * 9}" r="4.5" fill="var(--c-ember)" stroke="var(--panel)" stroke-width="2"><title>${p.day}: ${p.ratio}×</title></circle>`);
+    const pooled = E.dusk["200"].pooled;
+    g += `<line x1="${x(pooled)}" x2="${x(pooled)}" y1="8" y2="${H - 26}" stroke="var(--ink)" stroke-width="2"/><text class="val" x="${x(pooled) + 5}" y="18">${pooled}× overall</text>`;
+    cards.push(card(`The same fire lit at 5 pm does <span style="color:var(--c-ember)">${pooled}×</span> the harm of one at 1 pm`,
+      `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Exposure ratio, evening vs afternoon, every day above 1">${g}</svg>`,
+      `Population smoke exposure from identical emissions released at 17:00 vs 13:00 IST, each of 47 days of 2024 (ERA5 weather, WorldPop). After sunset the mixing layer collapses to tens of metres. With a 400 m plume floor: ${E.dusk["400"].pooled}×. Worse on every day.`,
+      table(["day", "ratio (200 m)"], d.map(p => [p.day, p.ratio]))));
+  }
+  // 3. planner: share of next-evening smoke harm covered by 20 teams
+  {
+    const rows = E.planner.filter(r => r.teams === 20 && r.method !== "saanjh: risk only").sort((a, b) => b.harm - a.harm);
+    const label = { "saanjh: expected harm": "Saanjh noon plan", "yesterday's GK-2A fires": "Yesterday's GK-2A fires", "last season's hotspots": "Last season's hotspots", "chase yesterday's VIIRS fires": "Chase yesterday's counted fires" };
+    const H = rows.length * 34 + 10, pl = 190, x = (v) => pl + v * (W - pl - 44);
+    let g = "";
+    rows.forEach((r, i) => {
+      const col = r.method.startsWith("saanjh") ? "var(--c-ember)" : r.method.startsWith("chase") ? "var(--official)" : "var(--muted)";
+      g += `<text x="${pl - 8}" y="${i * 34 + 20}" text-anchor="end" class="${r.method.startsWith("saanjh") ? "val" : ""}">${label[r.method] || r.method}</text>
+        <rect class="mark" x="${pl}" y="${i * 34 + 8}" width="${x(r.harm) - pl}" height="18" rx="4" fill="${col}"><title>${pct(r.harm)} of smoke harm, ${pct(r.energy)} of fire energy</title></rect>
+        <text class="val" x="${x(r.harm) + 6}" y="${i * 34 + 21}">${pct(r.harm)}</text>`;
+    });
+    cards.push(card(`Teams placed at noon by Saanjh reach <span style="color:var(--c-ember)">2.4×</span> more of the evening's smoke harm`,
+      `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Share of next-evening smoke harm covered by 20 field teams">${g}</svg>`,
+      `20 field teams, each patrolling ~33 km; share of the evening's smoke harm inside their blocks, every day of the 2025 test season. Fire-risk model: ROC AUC 0.90 (yesterday's counted fires alone: 0.59).`,
+      table(["teams", "placement", "harm covered", "fire energy covered"], E.planner.map(r => [r.teams, r.method, pct(r.harm), pct(r.energy)]))));
+  }
+  // 4. ablation: dumbbells, overpass inventory -> overpass + missed fires
+  {
+    const rows = E.ablation, H = rows.length * 30 + 30, pl = 190, x = (v) => pl + v / 0.5 * (W - pl - 20);
+    const name = (r) => `${r.region === "all" ? "All stations" : r.region === "Delhi-NCR" ? "Delhi-NCR" : "Near the fires"} · ${r.period}`;
+    let g = [0, 0.1, 0.2, 0.3, 0.4, 0.5].map(t => `<line x1="${x(t)}" x2="${x(t)}" y1="6" y2="${H - 22}" stroke="var(--rule)"/><text x="${x(t)}" y="${H - 8}" text-anchor="middle">${t.toFixed(1)}</text>`).join("");
+    rows.forEach((r, i) => {
+      const yy = i * 30 + 18, sig = r.ci[0] > 0;
+      g += `<text x="${pl - 8}" y="${yy + 4}" text-anchor="end" class="${sig ? "val" : ""}">${name(r)}${sig ? " ✓" : ""}</text>
+        <line x1="${x(r.overpass)}" x2="${x(r.hybrid)}" y1="${yy}" y2="${yy}" stroke="var(--muted)" stroke-width="2"/>
+        <circle class="mark" cx="${x(r.overpass)}" cy="${yy}" r="5" fill="var(--official)" stroke="var(--panel)" stroke-width="2"><title>overpass inventory r = ${r.overpass}</title></circle>
+        <circle class="mark" cx="${x(r.hybrid)}" cy="${yy}" r="5" fill="var(--c-ember)" stroke="var(--panel)" stroke-width="2"><title>+ missed fires r = ${r.hybrid}; gain 95% CI [${r.ci[0]}, ${r.ci[1]}]</title></circle>`;
+    });
+    cards.push(card(`Adding the fires the count misses explains more of the measured pollution near the fires`,
+      `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Correlation with measured PM2.5, before and after adding missed fires">${g}</svg>
+       <div class="key"><span><i style="background:var(--official)"></i>today's overpass inventory</span><span><i style="background:var(--c-ember)"></i>+ fires Saanjh saw that it missed</span></div>`,
+      `Correlation of modelled farm smoke with measured daily PM2.5 at CPCB stations (OpenAQ), 2025 held out. ✓ = 95% bootstrap CI of the gain excludes zero. No change in Delhi, where local sources dominate.`,
+      table(["stations", "period", "r overpass", "r with missed fires", "gain 95% CI"], rows.map(r => [name(r), r.period, r.overpass, r.hybrid, `[${r.ci[0]}, ${r.ci[1]}]`]))));
+  }
+  // 5. detection limit: probability of detection by fire power, both years
+  {
+    const H = 150, pl = 34, pb = 24, bins = E.detection[2025].map(b => b.bin), n = bins.length;
+    const x = (i) => pl + 10 + i * (W - pl - 30) / (n - 1), y = (v) => (H - pb) - v / 0.6 * (H - pb - 8);
+    let g = [0, 0.2, 0.4, 0.6].map(t => `<line x1="${pl}" x2="${W}" y1="${y(t)}" y2="${y(t)}" stroke="var(--rule)"/><text x="${pl - 6}" y="${y(t) + 4}" text-anchor="end">${pct(t)}</text>`).join("");
+    bins.forEach((b, i) => g += `<text x="${x(i)}" y="${H - 6}" text-anchor="middle">${b}</text>`);
+    [[2024, "var(--muted)", "4 3"], [2025, "var(--c-ember)", ""]].forEach(([yr, col, dash]) => {
+      const pts = E.detection[yr];
+      g += `<polyline fill="none" stroke="${col}" stroke-width="2" stroke-dasharray="${dash}" points="${pts.map((p, i) => `${x(i)},${y(p.pod)}`).join(" ")}"/>`;
+      pts.forEach((p, i) => g += `<circle class="mark" cx="${x(i)}" cy="${y(p.pod)}" r="4.5" fill="${col}" stroke="var(--panel)" stroke-width="2"><title>${yr}, ${p.bin} MW: ${pct(p.pod)} of ${p.n} VIIRS fire pixels</title></circle>`);
+      g += `<text class="val" x="${x(n - 1) + 8}" y="${y(pts[n - 1].pod) + 4}">${yr}</text>`;
+    });
+    cards.push(card(`GK-2A sees the big fires, not the small ones, and we report that`,
+      `<svg viewBox="0 0 ${W + 30} ${H}" role="img" aria-label="Detection probability rises with fire power, same in both years">${g}</svg>`,
+      `Share of VIIRS fire pixels GK-2A also detected at the 13:30 overpass, by fire power (MW). From 66° off vertical its pixels are ~4 km; the curve is the same in the tuning (2024) and test (2025) seasons.`,
+      table(["MW", "2024", "2025"], E.detection[2025].map((p, i) => [p.bin, pct(E.detection[2024][i].pod), pct(p.pod)]))));
+  }
+  // 6. the negative result
+  {
+    const a = Object.fromEntries(E.alerts.map(r => [r.method, r]));
+    cards.push(card(`Where it doesn't help: predicting tomorrow's worst mornings`,
+      `<p>A night-before warning built on the smoke forecast does <b>not</b> beat "tomorrow will be like today" at picking a station's worst mornings: skill ${a["persistence"].heidke.toFixed(2)} for persistence vs ${a["saanjh"].heidke.toFixed(2)} for smoke alone and ${(a["persistence+hybrid"] || a["persistence+saanjh"]).heidke.toFixed(2)} combined.</p>`,
+      `Heidke skill over ~3,400 station-mornings in 2025. Bad mornings come in multi-day stagnation spells, and farm smoke is one source among many. So Saanjh's notices say where and when farm smoke is heading, and point schools to the local PM2.5 reading.`, "", "neg"));
+  }
+  $("#ev-grid").innerHTML = cards.join("");
+}
 
 /* ---------- tabs ---------- */
 function selectTab(which) {

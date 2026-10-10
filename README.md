@@ -14,7 +14,9 @@ system that study calls for:
 3. **Follow the smoke.** Moves it with forecast winds through the boundary layer, which shrinks to tens of metres after sunset.
 4. **Act.** Ranks tonight's fires by how many people will breathe their smoke (for district officers) and
    tells each town when the smoke arrives (for schools), in English, Hindi and Punjabi.
-5. **Prevent.** At 11:30 IST, before the burning starts, predicts where tonight's fires are likely and places field
+5. **Attribute.** Splits each town's farm smoke by state and source area (exact within the linear smoke model):
+   on 18 Nov 2024, Delhi's farm smoke came 84% from Punjab and 16% from Haryana.
+6. **Prevent.** At 11:30 IST, before the burning starts, predicts where tonight's fires are likely and places field
    teams where they would avert the most smoke harm.
 
 ## What we measured (2024 season, details in [results/NOTES.md](results/NOTES.md))
