@@ -124,19 +124,28 @@ class Met:
 
 
 def run(met: Met, lat, lon, t_rel, mass_kg, hours=36, n_per=40, dt_min=15, seed=0,
-        out_every_h=1, h_min=H_MIN, receptors=None):
+        out_every_h=1, h_min=H_MIN, receptors=None, perturb=None):
     """Release n_per particles per source (t_rel in hours since met.t0) and follow each for `hours`.
 
     Returns (conc, src_exposure): conc[k, y, x] ground PM2.5 (ug/m3) at output step k (hourly from
     the earliest release), and per-source population exposure (ug/m3 * person * h).
+    perturb (ensemble members): dict(rot_deg, wind_scale, blh_scale) applied to the weather.
     """
+    rot, wscale, bscale = ((np.radians(perturb.get("rot_deg", 0.0)), perturb.get("wind_scale", 1.0),
+                            perturb.get("blh_scale", 1.0)) if perturb else (0.0, 1.0, 1.0))
+
+    def wx(t, la, lo, depth=None):
+        u, v, b = met.at(t, la, lo, depth)
+        if perturb:
+            u, v = (wscale * (u * np.cos(rot) - v * np.sin(rot)), wscale * (u * np.sin(rot) + v * np.cos(rot)))
+        return u, v, b * bscale
     rng = np.random.default_rng(seed)
     pop, area = population(), cell_area_m2()
     src = np.repeat(np.arange(len(lat)), n_per)
     plat, plon = np.repeat(lat, n_per).astype(float), np.repeat(lon, n_per).astype(float)
     trel = np.repeat(t_rel, n_per).astype(float)
     m = np.repeat(mass_kg / n_per, n_per) * 1e9  # ug
-    _, _, blh0 = met.at(trel, plat, plon)
+    _, _, blh0 = wx(trel, plat, plon)
     hp = np.maximum(blh0, h_min)
     t_start, t_end = trel.min(), trel.max() + hours
     steps = int(round((t_end - t_start) * 60 / dt_min))
@@ -169,15 +178,15 @@ def run(met: Met, lat, lon, t_rel, mass_kg, hours=36, n_per=40, dt_min=15, seed=
         if not live.any():
             continue
         la, lo = plat[live], plon[live]
-        u1, v1, _ = met.at(np.full(la.shape, t), la, lo, hp[live])
+        u1, v1, _ = wx(np.full(la.shape, t), la, lo, hp[live])
         lam = la + v1 * dt_s / 2 / 110570.0
         lom = lo + u1 * dt_s / 2 / (111320.0 * np.cos(np.radians(la)))
-        u2, v2, _ = met.at(np.full(la.shape, t + dt_h / 2), lam, lom, hp[live])
+        u2, v2, _ = wx(np.full(la.shape, t + dt_h / 2), lam, lom, hp[live])
         la = la + (v2 * dt_s + rng.normal(0, sig, la.shape)) / 110570.0
         lo = lo + (u2 * dt_s + rng.normal(0, sig, la.shape)) / (111320.0 * np.cos(np.radians(la)))
         plat[live], plon[live] = la, lo
         gone[live] = ~((la > LAT0) & (la < LAT0 + NY * D) & (lo > LON0) & (lo < LON0 + NX * D))
-        _, _, blh = met.at(np.full(la.shape, t + dt_h), la, lo)
+        _, _, blh = wx(np.full(la.shape, t + dt_h), la, lo)
         hp[live] = np.maximum(hp[live], blh)
     return (conc, expo, dose) if receptors is not None else (conc, expo)
 

@@ -30,6 +30,12 @@ FINDINGS = """Measured by Saanjh (Punjab + Haryana, 15 Oct - 30 Nov, every 10-mi
 - Adding the missed fires to today's overpass inventory raises the day-to-day correlation of modelled smoke with
   measured PM2.5 near the fires from 0.23 to 0.28 (2025, 95% CI +0.02 to +0.10); no change in Delhi.
 - A night-before smoke warning does not beat 'tomorrow will be like today' for predicting bad mornings.
+- Noon team plan (2025 held out): 20 field teams placed by expected smoke harm cover 75% of that evening's smoke
+  harm, vs 31% when teams chase the previous day's officially counted fires. Fire-risk model ROC AUC 0.90.
+- Each town's farm smoke is split by state and source area (exact within the linear smoke model); e.g. on
+  18 Nov 2024 Delhi's farm smoke came 84% from Punjab and 16% from Haryana.
+- Town values are the median over 9 weather scenarios (perturbed wind direction/speed, mixing height, plume
+  height); p_alert is the share of scenarios above 25 ug/m3.
 Rankings are by modelled population exposure (people x hours x ug/m3) over the next ~30 hours."""
 
 SYSTEM = """You are Saanjh's assistant for district officers and school staff in Punjab and Haryana.
@@ -81,7 +87,9 @@ def make_agent(day=None):
 
     @tool
     def get_town(name: str) -> dict:
-        """When farm-fire smoke reaches a town tonight (IST) and its modelled peak farm-smoke PM2.5 (ug/m3)."""
+        """When farm-fire smoke reaches a town tonight (IST), its modelled peak farm-smoke PM2.5 (ug/m3, median of
+        9 weather scenarios), the probability it exceeds 25 / 10 ug/m3, and where that smoke comes from
+        (shares by state and by source area)."""
         for t in _load(day)["towns"]:
             if t["town"].lower() == name.strip().lower():
                 return t

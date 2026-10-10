@@ -12,6 +12,23 @@ from scipy import ndimage
 from saanjh import detect, gk2a, smoke
 
 IST = timedelta(hours=5, minutes=30)
+ENSEMBLE = 8         # perturbed-weather smoke runs for arrival probabilities
+H_MIN_CENTRAL = smoke.H_MIN
+
+
+def _town_series(conc, cy, cx):
+    """Hourly farm-smoke PM2.5 over a town and its surroundings (3x3 model cells, ~15 km): less sampling noise
+    than a single 5 km cell next to a narrow plume."""
+    return conc[:, max(cy - 1, 0):cy + 2, max(cx - 1, 0):cx + 2].mean((1, 2))
+
+
+ARRIVAL_UGM3 = 5.0   # farm smoke "arrives" when it first adds this much PM2.5 over the town
+
+
+def _arrival(series):
+    """First hour the town's farm smoke reaches ARRIVAL_UGM3 (None if it never does)."""
+    hit = np.nonzero(series >= ARRIVAL_UGM3)[0]
+    return int(hit[0]) if len(hit) else None
 KG_PER_MJ = 0.368    # dry matter burned per MJ of fire radiative energy (Wooster et al. 2005)
 EF_PM25 = 6.26e-3    # kg PM2.5 per kg crop residue burned (Akagi et al. 2011)
 TOWNS = {  # name: (lat, lon)
@@ -84,6 +101,10 @@ def fire_events(day, step_min=60, viirs=None, detections=None):
     ev = d.groupby(["i", "j"]).agg(first=("t", "min"), last=("t", "max"), scans=("t", "size"),
                                    frp_peak=("frp", "max"), frp_sum=("frp", "sum"), z_max=("z", "max")).reset_index()
     ev["lat"], ev["lon"] = lat[ev.i, ev.j], lon[ev.i, ev.j]
+    noon = pd.Timestamp(day) + pd.Timedelta(hours=6, minutes=30)  # 12:00 IST
+    curves = d.sort_values("t").groupby(["i", "j"]).apply(
+        lambda g: [[int((t - noon).total_seconds() // 60), round(float(f), 1)] for t, f in zip(g.t, g.frp)])
+    ev["curve"] = [curves.get((a, b), []) for a, b in zip(ev.i, ev.j)]
     ev["fre_mj"] = ev.frp_sum * dt_s           # MW * s = MJ
     ev["pm25_kg"] = ev.fre_mj * KG_PER_MJ * EF_PM25
     ev["first_ist"] = (ev["first"] + IST).dt.strftime("%H:%M")
@@ -196,12 +217,39 @@ def tonight(day, met, events, hours=30, viirs=None):
                           from_areas=[dict(name=k, share=round(float(v), 3)) for k, v in by_area.head(5).items()])
     src = src.sort_values("harm", ascending=False)
     t0 = met.t0 + timedelta(hours=float(t_h.min()))
+    # Ensemble: perturbed weather (wind direction/speed, mixing height, plume floor) -> probabilities per town.
+    rng = np.random.default_rng(7)
+    members = [dict(rot_deg=rng.normal(0, 10), wind_scale=float(np.exp(rng.normal(0, 0.18))),
+                    blh_scale=float(np.exp(rng.normal(0, 0.3))), h_min=float(H_MIN_CENTRAL * np.exp(rng.normal(0, 0.3))))
+               for _ in range(ENSEMBLE)]
+    ens_peak = np.zeros((len(members), len(names)))
+    ens_arrive = np.full((len(members), len(names)), np.nan)
+    for k, mb in enumerate(members):
+        ce, _ = smoke.run(met, src.lat.to_numpy()[rel.row], src.lon.to_numpy()[rel.row], t_h, rel.kg.to_numpy(),
+                          hours=hours, n_per=15, seed=k + 1, h_min=mb.pop("h_min"), perturb=mb)
+        for j, (cy, cx) in enumerate(cells):
+            ser = _town_series(ce, cy, cx)
+            ens_peak[k, j] = ser.max()
+            a = _arrival(ser)
+            ens_arrive[k, j] = np.nan if a is None else a
     towns = []
     for name, (la, lo) in TOWNS.items():
-        series = conc[:, int((la - smoke.LAT0) / smoke.D), int((lo - smoke.LON0) / smoke.D)]
+        j = names.index(name)
+        series = _town_series(conc, *cells[j])
         k_peak = int(series.argmax())
-        over = np.nonzero(series > 0.25 * series.max())[0] if series.max() > 0 else []
-        towns.append(dict(town=name, lat=la, lon=lo, **origins.get(name, {}), peak_ugm3=series.max(), peak_ist=f"{t0 + timedelta(hours=k_peak) + IST:%a %H:%M}",
+        a = _arrival(series)
+        # Headline = median over the central run and the perturbed members; a single run near a narrow plume is
+        # either a direct hit or a miss, and the median is what the weather uncertainty supports.
+        peaks = np.r_[series.max(), ens_peak[:, j]]
+        arrs = np.r_[np.nan if a is None else a, ens_arrive[:, j]]
+        got = arrs[np.isfinite(arrs)]
+        a = int(np.median(got)) if len(got) > len(arrs) / 2 else None
+        over = [a] if a is not None else []
+        ens = dict(p_watch=round(float((peaks >= 10).mean()), 2), p_alert=round(float((peaks >= 25).mean()), 2),
+                   members=len(peaks), peak_central=round(float(series.max()), 1),
+                   arrive_window=[f"{t0 + timedelta(hours=int(got.min())) + IST:%a %H:%M}",
+                                  f"{t0 + timedelta(hours=int(got.max())) + IST:%a %H:%M}"] if a is not None else [])
+        towns.append(dict(town=name, lat=la, lon=lo, **origins.get(name, {}), **ens, peak_ugm3=float(np.median(peaks)), peak_ist=f"{t0 + timedelta(hours=k_peak) + IST:%a %H:%M}",
                           arrives_ist=f"{t0 + timedelta(hours=int(over[0])) + IST:%a %H:%M}" if len(over) else ""))
     return src, pd.DataFrame(towns).sort_values("peak_ugm3", ascending=False), conc, t0
 
@@ -239,7 +287,8 @@ def summary(day, ranked, towns, conc, t0, n_scans, replay=False, events=None):
                    missed_harm_share=round(float(gk_ranked.harm.sum() / ranked.harm.sum()), 3),
                    harm_total=float(ranked.harm.sum()),
                    first_seen=gk.groupby("first_ist").size().to_dict() if len(gk) else {}),
-        fires=json.loads(top[["lat", "lon", "near", "first_ist", "scans", "frp_peak", "pm25_kg", "counted", "harm", "source"]]
+        fires=json.loads(top[["lat", "lon", "near", "first_ist", "scans", "frp_peak", "pm25_kg", "counted", "harm", "source"]
+                             + (["curve"] if "curve" in top else [])]
                          .round(3).to_json(orient="records")),
         counted_cells=counted_cells[["lat", "lon"]].round(3).to_numpy().tolist(),
         towns=json.loads(towns.round(1).to_json(orient="records")),

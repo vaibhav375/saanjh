@@ -146,6 +146,9 @@ ol.teams li span { font-family: "Spline Sans Mono"; font-size: 12px; color: var(
 .ev details table td, .ev details table th { padding: 3px 6px; font-size: 12px; }
 .ev.neg { border-left: 4px solid var(--muted); }
 .ev .big { font: 760 44px/1 "Anek Latin"; font-stretch: 80%; color: var(--c-ember); }
+.spark { display: block; width: 100%; max-width: 360px; height: auto; margin-top: 10px; }
+.spark text { font: 400 10px "Spline Sans Mono"; fill: var(--muted); }
+.sparkcap { font: 400 11px "Spline Sans Mono"; color: var(--muted); }
 footer { margin-top: 28px; display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 18px; font-size: 14px; color: var(--muted); }
 footer h4 { margin: 0 0 4px; font: 600 14px "Anek Latin"; color: var(--ink); }
 footer p { margin: 0; }
@@ -447,6 +450,7 @@ function renderNotice() {
     <div class="langs">${["en", "hi", "pa"].map(l => `<button type="button" data-l="${l}" aria-pressed="${S.lang === l}">${{ en: "English", hi: "हिन्दी", pa: "ਪੰਜਾਬੀ" }[l]}</button>`).join("")}</div>
     <p class="msg" lang="${S.lang}">${MSG[S.lang](t)}</p>
     <p class="more">Farm smoke adds up to ~${t.peak_ugm3.toFixed(0)} µg/m³ PM2.5 at its peak (model estimate) · alerts go out above 25</p>
+    ${t.members ? `<p class="more">Confidence: in ${Math.round(t.p_alert * t.members)} of ${t.members} weather scenarios it tops 25 µg/m³, in ${Math.round(t.p_watch * t.members)} it tops 10${t.arrive_window && t.arrive_window.length ? `; arrival between ${t.arrive_window[0].slice(-5)} and ${t.arrive_window[1].slice(-5)}` : ""}.</p>` : ""}
     ${originHTML(t)}</div>`;
   $("#notice").querySelectorAll(".langs button").forEach(b => b.addEventListener("click", () => { S.lang = b.dataset.l; renderNotice(); }));
 }
@@ -461,6 +465,18 @@ function buildFires() {
   $("#morefires").textContent = S.showAll ? "Show top 20" : "Show all 50";
 }
 $("#morefires").addEventListener("click", () => { S.showAll = !S.showAll; buildFires(); });
+function sparkline(f) {  // fire power every 10 minutes, 12:00-22:00 IST, with the polar-satellite pass marked
+  if (!f.curve || !f.curve.length) return "";
+  const W = 320, H = 70, x = (m) => 20 + m / 600 * (W - 40), mx = Math.max(...f.curve.map(p => p[1]), 1), y = (v) => H - 16 - v / mx * (H - 26);
+  const pts = f.curve.map(([m, v]) => `${x(m)},${y(v)}`).join(" ");
+  return `<svg viewBox="0 0 ${W} ${H}" class="spark" role="img" aria-label="Fire power seen every 10 minutes">
+    <line x1="${x(90)}" x2="${x(90)}" y1="4" y2="${H - 16}" stroke="var(--official)" stroke-dasharray="3 3"/>
+    <text x="${x(90) + 4}" y="12">satellite pass</text>
+    <polyline points="${pts}" fill="none" stroke="var(--c-ember)" stroke-width="2"/>
+    ${f.curve.map(([m, v]) => `<circle cx="${x(m)}" cy="${y(v)}" r="2.5" fill="var(--c-ember)"><title>${String(12 + Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")} IST · ${v} MW</title></circle>`).join("")}
+    ${[0, 120, 240, 360, 480, 600].map(m => `<text x="${x(m)}" y="${H - 3}" text-anchor="middle">${12 + m / 60}:00</text>`).join("")}
+  </svg><div class="sparkcap">Fire power seen by GK-2A every 10 minutes (peak ${Math.round(mx)} MW)</div>`;
+}
 function selectFire(i) {
   S.fire = i; const f = S.d.fires[i], tot = S.d.stats.harm_total;
   const k = Math.round((firstSeenMs(f) - frameTime(0)) / 3600e3) + 6; if (k >= 0) S.frame = Math.min(k, S.frames.length - 1);
@@ -471,6 +487,7 @@ function selectFire(i) {
   $("#why").innerHTML = `<div class="why"><b>Why #${i + 1}:</b> near ${f.near}, ${seen}.
     ${f.counted ? "It is in the official count." : "<b>It started after the polar satellites passed, so the official count missed it.</b>"}
     Its smoke drifts into populated areas under tonight's shallow air layer, giving it ${(f.harm / tot * 100).toFixed(1)}% of all people-hours of farm smoke from today's fires.
+    ${sparkline(f)}
     <br><button type="button" id="askwhy">Ask Saanjh why</button></div>`;
   $("#askwhy").addEventListener("click", () => ask({ rank: i + 1 }));
 }

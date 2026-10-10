@@ -13,7 +13,8 @@ system that study calls for:
 2. **Count energy, not dots.** Estimates each fire's radiative power over its lifetime and the PM2.5 it releases.
 3. **Follow the smoke.** Moves it with forecast winds through the boundary layer, which shrinks to tens of metres after sunset.
 4. **Act.** Ranks tonight's fires by how many people will breathe their smoke (for district officers) and
-   tells each town when the smoke arrives (for schools), in English, Hindi and Punjabi.
+   tells each town when the smoke arrives (for schools), in English, Hindi and Punjabi, with a probability from a
+   9-scenario weather ensemble and each fire's 10-minute fire-power story.
 5. **Attribute.** Splits each town's farm smoke by state and source area (exact within the linear smoke model):
    on 18 Nov 2024, Delhi's farm smoke came 84% from Punjab and 16% from Haryana.
 6. **Prevent.** At 11:30 IST, before the burning starts, predicts where tonight's fires are likely and places field

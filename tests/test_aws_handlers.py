@@ -19,7 +19,8 @@ def test_replay_day_then_model(monkeypatch):
     monkeypatch.setenv("AWS_DEFAULT_REGION", "us-east-1")
     for b in ("data-b", "site-b"):
         boto3.client("s3").create_bucket(Bucket=b)
-    from saanjh import aws, gk2a
+    from saanjh import aws, gk2a, pipeline
+    monkeypatch.setattr(pipeline, "ENSEMBLE", 2)  # keep the test fast; the live system runs 8 members
     monkeypatch.setattr(aws, "s3", boto3.client("s3"))
     monkeypatch.setattr(aws, "BUCKET", "data-b")
     monkeypatch.setattr(aws, "read_scan", gk2a.cached_bt)

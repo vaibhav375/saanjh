@@ -226,3 +226,15 @@ Share of next-evening smoke harm covered, 2025, energy-weighted over days [boots
 With the same 20 teams, Saanjh's noon plan covers 2.4× the evening's smoke harm that chasing yesterday's counted fires
 does. Most of that comes from seeing the evening fires at all; the model adds ~10 points over reusing yesterday's
 GK-2A fires. Caveat: harm weights used ERA5 (actual) weather; the live plan uses forecasts.
+
+## Product additions (10 Oct): attribution, uncertainty, fire stories
+
+- **Smoke attribution.** The smoke model is linear in emissions, so each town's dose splits exactly by source fire.
+  Sources are tagged by state (point-in-polygon on geoBoundaries) and nearest district town. 18 Nov 2024: Delhi's
+  farm smoke 84% Punjab (India), 16% Haryana; 10 Nov 2025: Moga 88% Punjab (India), 11% Punjab (Pakistan).
+- **Ensemble.** 8 extra runs with perturbed weather (wind direction σ 10°, speed ×e^N(0,0.18), mixing height
+  ×e^N(0,0.3), plume floor 200 m ×e^N(0,0.3)); each town reports the median of 9 peaks, P(>25), P(>10) and an
+  arrival window (first hour ≥ 5 µg/m³). Lesson: next to the fires a single run is a hit or a miss — Fazilka on
+  10 Nov 2025 was 54 µg/m³ in the central run but 14 µg/m³ as the median, with 1 of 9 scenarios above 25. Towns
+  are now read over 3×3 model cells (~15 km) to cut particle sampling noise.
+- **Fire stories.** Each GK-2A fire keeps its 10-minute fire-power series; the page draws it against the 13:30 pass.
