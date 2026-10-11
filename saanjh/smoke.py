@@ -76,6 +76,20 @@ class Met:
         return u, v, np.maximum(self.blh(p), 10.0)
 
     @classmethod
+    def _covering(cls, kind, start, end):
+        """Slice [start, end] out of a cached file that spans it (e.g. a whole season), so replays need no API."""
+        import glob
+        for f in glob.glob(os.path.join(DATA, "met", f"{kind}_*_*.npz")):
+            a, b = (datetime.strptime(x, "%Y%m%d") for x in os.path.basename(f)[:-4].split("_")[1:3])
+            if a <= start and end <= b:
+                z = np.load(f)
+                i0, n = (start - a).days * 24, ((end - start).days + 1) * 24
+                cut = lambda k: z[k][i0:i0 + n]
+                return cls(start, n, z["lats"], z["lons"], cut("u"), cut("v"), np.nan_to_num(cut("blh"), nan=300.0),
+                           np.nan_to_num(cut("u10")), np.nan_to_num(cut("v10")))
+        return None
+
+    @classmethod
     def era5(cls, start: datetime, end: datetime, forecast=False):
         """Hourly fields for [start, end] (UTC dates) via Open-Meteo, cached: ERA5 reanalysis for
         replays, or the live forecast (which serves recent past days too) when forecast=True."""
@@ -83,6 +97,9 @@ class Met:
         path = os.path.join(DATA, "met", f"{kind}_{start:%Y%m%d}_{end:%Y%m%d}.npz")
         api = ("https://api.open-meteo.com/v1/forecast" if forecast
                else "https://archive-api.open-meteo.com/v1/era5")
+        cover = cls._covering(kind, start, end)
+        if cover is not None and not os.path.exists(path):
+            return cover
         if not os.path.exists(path):
             lats = np.arange(LAT0, LAT0 + NY * D + MET_D, MET_D)
             lons = np.arange(LON0, LON0 + NX * D + MET_D, MET_D)
@@ -98,7 +115,11 @@ class Met:
                         hourly="wind_speed_100m,wind_direction_100m,wind_speed_10m,wind_direction_10m,boundary_layer_height",
                         wind_speed_unit="ms"))
                     if r.ok:
-                        break
+                        try:
+                            js = r.json()  # Open-Meteo sometimes cuts a response short: retry it like an error
+                            break
+                        except ValueError:
+                            pass
                     time.sleep(20 * (attempt + 1))  # free tier rate limit
                 r.raise_for_status()
                 js = r.json()

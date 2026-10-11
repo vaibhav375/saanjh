@@ -124,13 +124,18 @@ def build(district, night, plan, dist_record):
 
     # 3. Towns
     h("3. Farm smoke reaching towns in this district", 12)
-    towns = [t for t in (night or {}).get("towns", []) if "lat" in t and inside(t["lat"], t["lon"])]
+    mine = [t for t in (night or {}).get("towns", []) if "lat" in t and inside(t["lat"], t["lon"])]
+    towns = [t for t in mine if t.get("arrives_ist")]  # towns the farm smoke actually reaches (>= 5 ug/m3)
+    dow = (night or {}).get("day") and __import__("datetime").date.fromisoformat(night["day"]).strftime("%a")
+    when = lambda x: "-" if not x else x[-5:] if x[:3] == dow else x  # weekday only when it isn't this date
     if towns:
         table(["Town", "Smoke from (IST)", "Heaviest (IST)", "Peak ug/m3", "Chance > 25"],
-              [[t["town"], (t.get("arrives_ist") or "-")[-5:], max((t.get("peak_ist") or "-")[-5:], (t.get("arrives_ist") or "")[-5:]), f"{t['peak_ugm3']:.0f}",
+              [[t["town"], when(t.get("arrives_ist")), when(t.get("peak_ist")), f"{t['peak_ugm3']:.0f}",
                 f"{round(t.get('p_alert', 0) * 100)}%" if "p_alert" in t else "-"] for t in towns], [40, 34, 32, 30, 30])
         p("Schools: before tomorrow's morning assembly, check the local PM2.5 reading (CPCB Sameer app); "
           "if it is above 90, hold assembly indoors.", 9.5, INK)
+    elif mine:
+        p(f"Little or no farm smoke expected in this district's towns ({', '.join(t['town'] for t in mine)}).")
     else:
         p("No Saanjh town in this district.")
     return bytes(pdf.output())

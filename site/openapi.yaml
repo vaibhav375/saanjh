@@ -106,7 +106,17 @@ components:
       properties:
         day: { type: string, format: date }
         replay: { type: boolean }
-        stats: { type: object, properties: { events: { type: integer }, counted: { type: integer }, uncounted_energy_share: { type: number }, pm25_t: { type: number } } }
+        stats:
+          type: object
+          properties:
+            events: { type: integer, description: Fires GK-2A saw }
+            counted: { type: integer, description: Of those, burning and seen by VIIRS at the ~13:30 pass }
+            confirmed: { type: integer, description: Of those, seen for 30 minutes or more (single images are unconfirmed) }
+            uncounted_energy_share: { type: number, description: Share of GK-2A fire energy from fires the count missed }
+            pm25_gk_t: { type: number, description: Tonnes of PM2.5 from the fires GK-2A saw }
+            viirs_only: { type: integer, description: Small fires VIIRS counted at 13:30 that GK-2A did not see }
+            pm25_t: { type: number, description: Tonnes of PM2.5 from all fires in the smoke model, including the VIIRS-only ones }
+            missed_harm_share: { type: number, description: Share of population smoke exposure from fires the count missed }
         fires: { type: array, items: { $ref: "#/components/schemas/Fire" } }
         towns: { type: array, items: { $ref: "#/components/schemas/Town" } }
         grid: { type: object, description: "Smoke frame grid: lat0, lon0, d (deg), ny, nx, t0" }

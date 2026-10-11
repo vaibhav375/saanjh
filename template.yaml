@@ -115,7 +115,7 @@ Resources:
           Type: ScheduleV2
           Properties:
             # 12:35 IST to 00:35 IST, every hour
-            ScheduleExpression: cron(35 7-19 * * ? *)
+            ScheduleExpression: cron(5 7-19 * * ? *)
 
   # Noon plan: tonight's fire risk and where to send field teams, before the 16:00 IST burning starts.
   PlanFn:

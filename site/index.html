@@ -115,6 +115,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .kpi { background: var(--night-1); padding: 9px 10px; }
 .kpi b { display: block; font: 700 18px/1.1 var(--display); font-stretch: 110%; font-variant-numeric: tabular-nums; }
 .kpi span { font: 400 11px/1.25 var(--text); color: var(--ink-3); }
+#k-note { margin: 8px 2px 0; }
 
 .tabs { display: grid; grid-template-columns: repeat(4, 1fr); position: relative; margin: 12px 14px 0; padding: 4px; background: rgba(7,19,28,.6); border-radius: 11px; border: 1px solid var(--rule); }
 .tabs button { position: relative; z-index: 1; border: 0; background: transparent; padding: 9px 6px; font: 600 12.5px/1.2 var(--text); color: var(--ink-2); border-radius: 8px; transition: color .25s var(--ease); }
@@ -340,12 +341,13 @@ button { font: inherit; color: inherit; cursor: pointer; }
 <aside class="panel glass" aria-label="Tonight">
   <section class="hero">
     <div class="eyebrow"><span id="nightlabel">Tonight</span><span class="pill" id="modepill">live</span></div>
-    <div class="big"><b id="bigshare">–</b><span>of the fire energy seen tonight came <em>after</em> the satellites behind India's official count had passed</span></div>
+    <div class="big"><b id="bigshare">–</b><span id="bigtext">of the fire energy GK-2A saw tonight came <em>after</em> the satellites behind India's official count had passed</span></div>
     <div class="kpis">
       <div class="kpi"><b id="k-fires">–</b><span>fires GK-2A saw</span></div>
-      <div class="kpi"><b id="k-counted">–</b><span>burning at the 13:30 pass</span></div>
-      <div class="kpi"><b id="k-pm">–</b><span>PM2.5 released</span></div>
+      <div class="kpi"><b id="k-counted">–</b><span>of them counted at the 13:30 pass</span></div>
+      <div class="kpi"><b id="k-pm">–</b><span>PM2.5 from them</span></div>
     </div>
+    <p class="fine" id="k-note" hidden></p>
   </section>
   <div class="tabs" role="tablist" aria-label="Views">
     <i class="slider" id="tabslider" aria-hidden="true"></i>
@@ -447,7 +449,7 @@ const Q = new URLSearchParams(location.search);
 const S = { day: Q.get("day") || "", d: null, plan: null, frames: [], t: 0, playing: false, tab: "towns", town: null, fire: null, showAll: false, lang: "en", is3d: true };
 const TOWNS = { Delhi: [28.61, 77.21], Gurugram: [28.46, 77.03], Noida: [28.54, 77.39], Ghaziabad: [28.67, 77.45], Faridabad: [28.41, 77.32], Meerut: [28.98, 77.71], Sonipat: [28.99, 77.02], Panipat: [29.39, 76.97], Karnal: [29.69, 76.99], Rohtak: [28.89, 76.61], Hisar: [29.15, 75.72], Sirsa: [29.53, 75.03], Ambala: [30.38, 76.78], Chandigarh: [30.73, 76.78], Patiala: [30.34, 76.39], Sangrur: [30.25, 75.84], Ludhiana: [30.9, 75.85], Jalandhar: [31.33, 75.58], Amritsar: [31.63, 74.87], Moga: [30.82, 75.17], Bathinda: [30.21, 74.95], Ferozepur: [30.93, 74.61], Muktsar: [30.47, 74.52], Fazilka: [30.4, 74.03], Fatehabad: [29.52, 75.45], Ratia: [29.69, 75.58], Tohana: [29.71, 75.9], Mansa: [29.99, 75.4], Barnala: [30.38, 75.55], Kaithal: [29.8, 76.4], Jind: [29.32, 76.31], "Tarn Taran": [31.45, 74.93], Kapurthala: [31.38, 75.38], Faridkot: [30.67, 74.76], Abohar: [30.14, 74.2], Malerkotla: [30.53, 75.88], Gurdaspur: [32.04, 75.4], Hoshiarpur: [31.53, 75.91], Rupnagar: [30.97, 76.53], Kurukshetra: [29.97, 76.85], Yamunanagar: [30.13, 77.27], Bhiwani: [28.79, 76.13], Ellenabad: [29.45, 74.66], "Talwandi Sabo": [29.98, 75.08] };
 const HOME = { center: [75.9, 29.95], zoom: 6.75, pitch: 52, bearing: -14 };
-const QUIET = 30, SHOWCASE = "2025-11-10";
+const QUIET = 30, SHOWCASE = "2025-11-10", MIN_CONFIRMED = 5, KG_PM25_PER_MJ = 0.368 * 6.26e-3; // Wooster 2005 × Akagi 2011, as in pipeline.py
 const qs = (p) => (S.day ? `${p}?day=${S.day}` : p);
 const fmtIST = (ms) => new Date(ms + IST).toISOString().slice(11, 16);
 const dayIST = (ms) => new Date(ms + IST).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
@@ -611,7 +613,7 @@ const frameTime = (k) => Date.parse(S.d.grid.t0) + k * 3600e3;
 async function load() {
   loadDays();
   let [d, borders] = await Promise.all([getJSON(qs("tonight.json")), getJSON("borders.json")]);
-  if (!S.day && !Q.has("live") && (d.stats.events || 0) < QUIET) { // early or late in the season the live night can be nearly empty
+  if (!S.day && !Q.has("live") && ((d.stats.events || 0) < QUIET || (d.stats.confirmed ?? QUIET) < MIN_CONFIRMED)) { // early or late in the season the live night can be nearly empty
     S.day = SHOWCASE; d = await getJSON(qs("tonight.json")); $("#day").value = SHOWCASE;
     setTimeout(() => toast(`A quiet night so far, so you're seeing ${new Date(SHOWCASE).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}, a peak night. Pick "Live · tonight" to switch back.`), 3600);
   }
@@ -670,10 +672,16 @@ function renderHero() {
   $("#nightlabel").textContent = new Date(S.d.day).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "long", year: "numeric" });
   $("#modepill").textContent = S.d.replay ? "replay" : "live";
   $("#livedot").classList.toggle("on", !S.d.replay);
-  countUp($("#bigshare"), st.uncounted_energy_share * 100, (v) => `${Math.round(v)}%`);
+  // A share is only worth showing once enough fires are confirmed (seen for 30 min+; single images are unverified, N7).
+  if (st.confirmed != null && st.confirmed < MIN_CONFIRMED) {
+    $("#bigshare").textContent = "–";
+    $("#bigtext").innerHTML = `Too few confirmed fires so far to give a share: ${st.events} seen, ${st.confirmed} of them for 30 minutes or more`;
+  } else countUp($("#bigshare"), st.uncounted_energy_share * 100, (v) => `${Math.round(v)}%`);
+  const pmGK = st.pm25_gk_t ?? st.fre_mj * KG_PM25_PER_MJ / 1000, nViirs = st.viirs_only ?? (S.d.counted_cells || []).length;
   countUp($("#k-fires"), st.events, (v) => Math.round(v).toLocaleString("en-IN"));
   countUp($("#k-counted"), st.counted, (v) => Math.round(v).toLocaleString("en-IN"));
-  countUp($("#k-pm"), st.pm25_t, (v) => `${Math.round(v)} t`);
+  countUp($("#k-pm"), pmGK, (v) => (pmGK < 10 ? `${v.toFixed(1)} t` : `${Math.round(v)} t`));
+  if (nViirs) { $("#k-note").hidden = false; $("#k-note").textContent = `VIIRS also counted ${nViirs.toLocaleString("en-IN")} small fire${nViirs > 1 ? "s" : ""} at 13:30 that GK-2A can't see; the smoke model includes them.`; }
   $("#townlist").innerHTML = Object.keys(TOWNS).sort().map((t) => `<option value="${t}">`).join("");
 }
 
@@ -710,15 +718,17 @@ function buildTowns() {
   $("#towns").innerHTML = shown.map((t, i) => { const lv = level(t.peak_ugm3), p = t.members ? (lv === "alert" ? t.p_alert : t.p_watch) : null;
     return `<li style="--i:${i}"><button class="row" type="button" data-town="${esc(t.town)}" aria-pressed="${S.town === t.town}">
     <span class="t">${esc(t.town)}</span><span class="lvl ${lv}">${LEVEL[lv]}${p != null && lv !== "low" ? ` · ${Math.round(p * 100)}%` : ""}</span>
-    <span class="s">${smoky(t) && t.arrives_ist ? `from ${t.arrives_ist.slice(-5)} · +${Math.round(t.peak_ugm3)} µg/m³ at peak` : "little farm smoke"}</span></button></li>`; }).join("")
+    <span class="s">${smoky(t) && t.arrives_ist ? `from ${when(t.arrives_ist)} · +${Math.round(t.peak_ugm3)} µg/m³ at peak` : "little farm smoke"}</span></button></li>`; }).join("")
     + (hidden ? `<li><button class="more-btn" id="alltowns" type="button">Show ${hidden} towns with little farm smoke</button></li>` : "");
   $("#towns").querySelectorAll(".row").forEach((b) => b.addEventListener("click", () => selectTown(b.dataset.town, true)));
   $("#alltowns")?.addEventListener("click", () => { S.allTowns = true; buildTowns(); });
 }
+// Times carry their weekday ("Tue 02:00"); show just the clock when it is the night's own date.
+const when = (x) => (!x ? "" : x.slice(0, 3) === new Date(S.d.day + "T12:00Z").toLocaleDateString("en-GB", { weekday: "short", timeZone: "UTC" }) ? x.slice(-5) : x);
 const MSG = {
-  en: (t) => `Farm-fire smoke is heading to ${t.town} tonight. It should arrive around ${t.arrives_ist.slice(-5)} and be heaviest around ${t.peak_ist.slice(-5)}. Before tomorrow's morning assembly, check the PM2.5 reading; if it is above 90, hold assembly indoors.`,
-  hi: (t) => `${t.town} की ओर आज रात पराली का धुआँ आ रहा है। यह लगभग ${t.arrives_ist.slice(-5)} बजे पहुँचेगा और ${t.peak_ist.slice(-5)} के आसपास सबसे ज़्यादा होगा। कल सुबह की प्रार्थना सभा से पहले PM2.5 देखें; 90 से ऊपर हो तो सभा अंदर करें।`,
-  pa: (t) => `${t.town} ਵੱਲ ਅੱਜ ਰਾਤ ਪਰਾਲੀ ਦਾ ਧੂੰਆਂ ਆ ਰਿਹਾ ਹੈ। ਇਹ ਲਗਭਗ ${t.arrives_ist.slice(-5)} ਵਜੇ ਪਹੁੰਚੇਗਾ ਅਤੇ ${t.peak_ist.slice(-5)} ਦੇ ਨੇੜੇ ਸਭ ਤੋਂ ਵੱਧ ਹੋਵੇਗਾ। ਕੱਲ੍ਹ ਸਵੇਰ ਦੀ ਸਭਾ ਤੋਂ ਪਹਿਲਾਂ PM2.5 ਵੇਖੋ; 90 ਤੋਂ ਵੱਧ ਹੋਵੇ ਤਾਂ ਸਭਾ ਅੰਦਰ ਕਰੋ।`,
+  en: (t) => `Farm-fire smoke is heading to ${t.town} tonight. It should arrive around ${when(t.arrives_ist)} and be heaviest around ${when(t.peak_ist)}. Before tomorrow's morning assembly, check the PM2.5 reading; if it is above 90, hold assembly indoors.`,
+  hi: (t) => `${t.town} की ओर आज रात पराली का धुआँ आ रहा है। यह लगभग ${when(t.arrives_ist)} बजे पहुँचेगा और ${when(t.peak_ist)} के आसपास सबसे ज़्यादा होगा। कल सुबह की प्रार्थना सभा से पहले PM2.5 देखें; 90 से ऊपर हो तो सभा अंदर करें।`,
+  pa: (t) => `${t.town} ਵੱਲ ਅੱਜ ਰਾਤ ਪਰਾਲੀ ਦਾ ਧੂੰਆਂ ਆ ਰਿਹਾ ਹੈ। ਇਹ ਲਗਭਗ ${when(t.arrives_ist)} ਵਜੇ ਪਹੁੰਚੇਗਾ ਅਤੇ ${when(t.peak_ist)} ਦੇ ਨੇੜੇ ਸਭ ਤੋਂ ਵੱਧ ਹੋਵੇਗਾ। ਕੱਲ੍ਹ ਸਵੇਰ ਦੀ ਸਭਾ ਤੋਂ ਪਹਿਲਾਂ PM2.5 ਵੇਖੋ; 90 ਤੋਂ ਵੱਧ ਹੋਵੇ ਤਾਂ ਸਭਾ ਅੰਦਰ ਕਰੋ।`,
 };
 const STATE_COL = { "Punjab (India)": "#F28A3B", Haryana: "#F6C453", "Punjab (Pakistan)": "#C79BE0", Rajasthan: "#7FC6A4", Delhi: "#8FD6EA", "Uttar Pradesh": "#E08AA8", "Himachal Pradesh": "#9DB7C9" };
 function arc(a, b) { // a gentle curve bowed to one side, like drifting smoke
@@ -732,7 +742,7 @@ function selectTown(name, fly) {
   const [la, lo] = TOWNS[name], src = (t.from_fires || []).slice(0, 6);
   map.getSource("arcs")?.setData(geo(src.map((s) => ({ type: "Feature", properties: { share: s.share }, geometry: { type: "LineString", coordinates: arc([s.lon, s.lat], [lo, la]) } }))));
   map.getSource("origins")?.setData(geo(src.map((s) => pt(s.lon, s.lat, { share: s.share }))));
-  const k = S.frames.findIndex((_, i) => fmtIST(frameTime(i)) === (t.peak_ist || "").slice(-5)); if (k >= 0) S.t = k;
+  const k = S.frames.findIndex((_, i) => fmtIST(frameTime(i)) === when(t.peak_ist)); if (k >= 0) S.t = k;
   if (!fly) return;
   if (src.length) {
     const b = new maplibregl.LngLatBounds([lo, la], [lo, la]); src.forEach((s) => b.extend([s.lon, s.lat]));
@@ -750,7 +760,7 @@ function renderTownCard() {
     `<div class="card"><h3>${esc(t.town)}: ${lv === "alert" ? "heavy farm smoke heading here tonight" : "farm smoke expected tonight"}</h3>
     <div class="seg" role="group" aria-label="Language">${["en", "hi", "pa"].map((l) => `<button type="button" data-l="${l}" aria-pressed="${S.lang === l}">${{ en: "English", hi: "हिन्दी", pa: "ਪੰਜਾਬੀ" }[l]}</button>`).join("")}</div>
     <p class="msg" lang="${S.lang}">${MSG[S.lang](t)}</p>
-    <p class="fine">Adds ~${Math.round(t.peak_ugm3)} µg/m³ of PM2.5 at its peak (model)${t.members ? ` · tops 25 in ${Math.round(t.p_alert * t.members)} of ${t.members} weather scenarios${t.arrive_window?.length ? ` · arrives ${t.arrive_window[0].slice(-5)}–${t.arrive_window[1].slice(-5)}` : ""}` : ""}</p>
+    <p class="fine">Adds ~${Math.round(t.peak_ugm3)} µg/m³ of PM2.5 at its peak (model)${t.members ? ` · tops 25 in ${Math.round(t.p_alert * t.members)} of ${t.members} weather scenarios${t.arrive_window?.length ? ` · arrives ${when(t.arrive_window[0])}–${when(t.arrive_window[1])}` : ""}` : ""}</p>
     ${origin}
     <div class="act">${src.length ? `<button class="btn primary" type="button" id="toorigin">Fly to where it starts</button>` : ""}<button class="btn" type="button" id="totown">Fly to ${esc(t.town)}</button></div></div>`;
   $("#towncard").querySelectorAll(".seg button").forEach((b) => b.addEventListener("click", () => { S.lang = b.dataset.l; renderTownCard(); }));
@@ -769,7 +779,7 @@ function buildFires() {
   $("#fires").innerHTML = rows.map((f, i) => `<li style="--i:${i}"><button class="row firerow" type="button" data-i="${i}" aria-pressed="${S.fire === i}">
     <span class="rank">${i + 1}</span><span class="t"><i class="heat" style="background:${fireColor(f.frp_peak)};box-shadow:0 0 10px ${fireColor(f.frp_peak)}"></i>${esc(f.near)}<span class="tag ${f.counted ? "counted" : "missed"}">${f.counted ? "COUNTED" : "MISSED"}</span></span>
     <span class="share">${(f.harm / tot * 100).toFixed(1)}%</span>
-    <span class="s">${f.source === "VIIRS" ? "seen at the 13:30 pass" : `first seen ${f.first_ist} · ${Math.round(f.frp_peak)} MW peak`}</span></button></li>`).join("");
+    <span class="s">${f.source === "VIIRS" ? "seen at the 13:30 pass" : `first seen ${f.first_ist} · ${Math.round(f.frp_peak)} MW peak${f.scans === 1 ? " · one image, unconfirmed" : ""}`}</span></button></li>`).join("");
   $("#fires").querySelectorAll(".row").forEach((b) => b.addEventListener("click", () => selectFire(+b.dataset.i, true)));
   $("#morefires").textContent = S.showAll ? "Show top 15" : "Show all 50";
 }
@@ -781,7 +791,7 @@ function selectFire(i, fly) {
   if (map.getSource("fires")) map.setFeatureState({ source: "fires", id: i }, { sel: true });
   buildFires(); pulseAt(f.lon, f.lat);
   if (fly) map.flyTo({ center: [f.lon, f.lat], zoom: 11, pitch: 62, bearing: map.getBearing() - 18, duration: 2300, curve: 1.4 });
-  const seen = f.source === "VIIRS" ? `counted by the polar satellites at their ~13:30 pass (${Math.round(f.frp_peak)} MW)` : `first seen by GK-2A at <b>${f.first_ist}</b>, burning through ${f.scans} ten-minute image${f.scans > 1 ? "s" : ""}, peak <b>${Math.round(f.frp_peak)} MW</b>`;
+  const seen = f.source === "VIIRS" ? `counted by the polar satellites at their ~13:30 pass (${Math.round(f.frp_peak)} MW)` : `first seen by GK-2A at <b>${f.first_ist}</b>, ${f.scans > 1 ? `burning through ${f.scans} ten-minute images` : "seen in only one ten-minute image, so it is unconfirmed (one-image detections are not borne out by the night satellite pass)"}, peak <b>${Math.round(f.frp_peak)} MW</b>`;
   $("#firecard").innerHTML = `<div class="card"><h3>#${i + 1} · near ${esc(f.near)}</h3>
     <p>${seen}; about <b>${Math.round(f.pm25_kg)} kg</b> of PM2.5. ${f.counted ? "It is in the official count." : "<b style='color:#FFB38A'>It started after the satellites passed, so the official count missed it.</b>"} Its smoke accounts for <b>${(f.harm / tot * 100).toFixed(1)}%</b> of the people-hours of farm smoke tonight.</p>
     ${sparkline(f)}<div class="act"><button class="btn primary" type="button" id="askwhy">Ask Saanjh why</button></div></div>`;
@@ -986,11 +996,12 @@ function ago(iso) { if (!iso) return "no image yet today"; const m = Math.round(
 async function pollStatus() {
   try {
     const st = await getJSON("status.json"), bad = st.alarms.some((a) => a.state === "ALARM");
-    const fresh = st.last_image && Date.now() - Date.parse(st.last_image) < 45 * 60000;
-    $("#sysdot").className = bad ? "bad" : fresh ? "ok" : "warn";
-    $("#systxt").innerHTML = bad ? "<b>Pipeline alarm</b>" : `<b>Pipeline live</b> <span>· last image ${ago(st.last_image)}</span>`;
-    $("#sgrid").innerHTML = [[st.images_24h.toLocaleString("en-IN"), "GK-2A images processed"], [st.detections_24h.toLocaleString("en-IN"), "fire detections"],
-      [st.latency_p50_min ? `${st.latency_p50_min} min` : "–", "image taken → on the map (median)"], [st.process_p50_s ? `${st.process_p50_s} s` : "–", "Lambda time per image"],
+    const age = st.last_image ? Date.now() - Date.parse(st.last_image) : Infinity, istHour = new Date(Date.now() + IST).getUTCHours();
+    const idle = istHour < 12 && age < 13 * 3600e3; // the detector watches 12:00–24:00 IST, when the fires burn
+    $("#sysdot").className = bad ? "bad" : age < 45 * 60000 || idle ? "ok" : "warn";
+    $("#systxt").innerHTML = bad ? "<b>Pipeline alarm</b>" : idle ? `<b>Pipeline idle</b> <span>· watches 12:00–24:00 IST</span>` : `<b>Pipeline live</b> <span>· last image ${ago(st.last_image)}</span>`;
+    $("#sgrid").innerHTML = [[st.images_24h.toLocaleString("en-IN"), "GK-2A images processed (12:00–24:00 IST)"], [st.detections_24h.toLocaleString("en-IN"), "fire detections"],
+      [st.latency_p50_min ? `${st.latency_p50_min} min` : "–", "image taken → fires detected (median)"], [st.process_p50_s ? `${st.process_p50_s} s` : "–", "Lambda time per image"],
       [st.invocations_24h.toLocaleString("en-IN"), "Lambda invocations"], [`$${st.lambda_cost_24h_usd.toFixed(2)}`, "Lambda compute cost"]].map(([b, t]) => `<div><b>${b}</b><span>${t}</span></div>`).join("");
     $("#alarms").innerHTML = st.alarms.map((a) => `<li>${esc(a.name)}<b class="${a.state}">${a.state === "INSUFFICIENT_DATA" ? "quiet" : a.state}</b></li>`).join("");
     $("#sysgen").textContent = `Last 24 hours · CloudWatch · updated ${fmtIST(Date.parse(st.generated))} IST`;
@@ -1062,7 +1073,7 @@ function renderEvidence(E) {
     [[2024, "var(--c-muted)", "4 3"], [2025, "var(--c-saanjh)", ""]].forEach(([yr, col, dash]) => { const p = E.detection[yr]; g += `<polyline fill="none" stroke="${col}" stroke-width="2" stroke-dasharray="${dash}" points="${p.map((q, i) => `${x(i)},${y(q.pod)}`).join(" ")}"/>` + p.map((q, i) => `<circle class="mark" cx="${x(i)}" cy="${y(q.pod)}" r="4.5" fill="${col}" stroke="var(--night-1)" stroke-width="2"><title>${yr}, ${q.bin} MW: ${pct(q.pod)}</title></circle>`).join("") + `<text class="val" x="${x(n - 1) + 8}" y="${y(p[n - 1].pod) + 4}">${yr}</text>`; });
     out.push(card(4, `GK-2A sees the big fires, not the small ones — and we report that`, `<svg viewBox="0 0 ${W + 30} ${H}" role="img" aria-label="Detection by fire power">${g}</svg>`, `Share of VIIRS fire pixels GK-2A also detected at the 13:30 overpass, by fire power (MW). From 66° off vertical its pixels are ~4 km; the curve is the same in 2024 and 2025. Small fires go unseen at every hour, so the missed energy in tonnes and TJ is a floor: the real total is higher.`, table(["MW", "2024", "2025"], E.detection[2025].map((p, i) => [p.bin, pct(E.detection[2024][i].pod), pct(p.pod)])))); }
   { const a = Object.fromEntries(E.alerts.map((r) => [r.method, r]));
-    out.push(card(5, `Where it doesn't help: predicting tomorrow's worst mornings`, `<p class="lede" style="margin:8px 0 0">A night-before warning built on the smoke forecast does <b>not</b> beat "tomorrow will be like today": skill ${a.persistence.heidke.toFixed(2)} for persistence vs ${a.saanjh.heidke.toFixed(2)} for smoke alone and ${(a["persistence+hybrid"] || a["persistence+saanjh"]).heidke.toFixed(2)} combined.</p>`, `Heidke skill over ~3,400 station-mornings, 2025. Bad mornings come in multi-day stagnation spells. So Saanjh's notices say where and when farm smoke is heading, and point schools to the local PM2.5 reading.`, "", "neg")); }
+    out.push(card(5, `Where it doesn't help: predicting tomorrow's worst mornings`, `<p class="lede" style="margin:8px 0 0">A night-before warning built on the smoke forecast does <b>not</b> beat "tomorrow will be like today": skill ${a.saanjh.heidke.toFixed(2)} for smoke alone vs ${a.persistence.heidke.toFixed(2)} for persistence, and adding smoke to persistence only moves it to ${(a["persistence+hybrid"] || a["persistence+saanjh"]).heidke.toFixed(2)}, within noise.</p>`, `Heidke skill over ~3,400 station-mornings, 2025. Bad mornings come in multi-day stagnation spells. So Saanjh's notices say where and when farm smoke is heading, and point schools to the local PM2.5 reading.`, "", "neg")); }
   out.push(card(out.length, `What we have checked, and what we haven't`, `<div class="limits"><div><h4>Checked against independent data</h4><ul><li>Detector tuned on 2024, frozen, then tested on 2025: 70% of its 13:30 detections match a VIIRS fire.</li><li>Evening fires lasting 30 min or more show up in the ~01:30 VIIRS pass well above chance (above).</li><li>Adding them makes modelled smoke track 82 CPCB stations better near the fires.</li><li>Noon fire-risk model: ROC AUC 0.90 on 2025.</li></ul></div><div><h4>Not yet, or not well</h4><ul><li>Fires seen in a single image (22% of evening energy) aren't confirmed by anything.</li><li>Fires under ~10 MW are mostly invisible to GK-2A.</li><li>Hourly smoke timing has little skill; alerts are about which nights and towns, not exact hours.</li><li>The pollution tests use 2025 only: OpenAQ has no CPCB station data for 2023–24.</li><li>No field trial yet: no officer or school has used it.</li></ul></div></div>`, `Full methods, numbers and negative results: results/NOTES.md in the code.`, "", "wide"));
   $("#ev-grid").innerHTML = out.join("");
 }

@@ -41,11 +41,16 @@ def test_live_message_parsing(monkeypatch):
     from saanjh import aws
     seen = []
     monkeypatch.setattr(aws, "_detect", lambda t: seen.append(t) or None)
+    done = set()
+    monkeypatch.setattr(aws, "_exists", lambda k: k in done)
     key = "AMI/L1B/FD/202610/09/11/gk2a_ami_le1b_sw038_fd020ge_202610091100.nc"
     other = "AMI/L1B/FD/202610/09/11/gk2a_ami_le1b_vi006_fd005ge_202610091100.nc"
     msg = lambda k: {"body": json.dumps({"Message": json.dumps({"Records": [{"s3": {"object": {"key": k}}}]})})}
     aws.detect_handler({"Records": [msg(key), msg(other)]})
     assert [t.strftime("%Y%m%d%H%M") for t in seen] == ["202610091100"]
+    done.add("detections/20261009/1100.csv")  # already processed: the other band's message must not redo it
+    aws.detect_handler({"Records": [msg(key)]})
+    assert len(seen) == 1
 
 
 @mock_aws

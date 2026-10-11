@@ -292,8 +292,11 @@ def summary(day, ranked, towns, conc, t0, n_scans, replay=False, events=None):
         stats=dict(events=len(gk), counted=int(gk.counted.sum()) if len(gk) else 0,
                    uncounted_energy_share=round(float(gk.fre_mj[~gk.counted].sum() / fre), 3) if fre else 0.0,
                    fre_mj=round(float(fre)), pm25_t=round(float(ranked.pm25_kg.sum()) / 1000, 1),
+                   pm25_gk_t=round(float(gk.pm25_kg.sum()) / 1000, 1) if len(gk) else 0.0,  # fires GK-2A saw only
+                   confirmed=int((gk.scans >= 3).sum()) if len(gk) else 0,  # seen for 30 min or more (N7)
+                   viirs_only=len(counted_cells),  # small fires VIIRS counted at 13:30 that GK-2A did not see
                    top20_harm_share=round(float(gk_ranked.harm.head(20).sum() / ranked.harm.sum()), 3),
-                   missed_harm_share=round(float(gk_ranked.harm.sum() / ranked.harm.sum()), 3),
+                   missed_harm_share=round(float(gk_ranked.harm[~gk_ranked.counted.astype(bool)].sum() / ranked.harm.sum()), 3),
                    harm_total=float(ranked.harm.sum()),
                    first_seen=gk.groupby("first_ist").size().to_dict() if len(gk) else {}),
         fires=json.loads(top[["lat", "lon", "near", "first_ist", "scans", "frp_peak", "pm25_kg", "counted", "harm", "source"]

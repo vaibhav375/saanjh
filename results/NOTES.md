@@ -273,3 +273,24 @@ the headline does not depend on the unconfirmed detections.
 Bounds: GK-2A misses most fires under ~10 MW at every hour (N2), so the missed energy in TJ and tonnes of PM2.5 is a
 floor. The missed *share* is not a strict bound (small fires are missed at 13:30 too); it assumes small fires are
 spread over the afternoon like large ones.
+
+District energy, confirmed fires only (events seen in ≥ 3 images, from `data/night_events.csv`): the 2024 → 2025
+rise holds in the four districts quoted in the docs: Sangrur +7% (+15% with all events), Bathinda +78% (+54%),
+Fazilka +56% (+58%), Mansa +54% (+45%). Sangrur's rise is the least robust.
+
+## Pre-submission audit (11 Oct 2026)
+
+Checked every published night (94 replays + live), plan, district, briefing PDF, the API and the assistant against
+their own data. Fixed:
+- Model Lambda: Open-Meteo occasionally returns truncated JSON; now retried (two hourly runs had failed).
+- Live detection: both band notifications could process the same image twice; the second is now skipped.
+- Status endpoint: CloudWatch sums are added across daily buckets; images counted once each; the page Lambda is
+  included in cost; latency labelled as image → fires detected; the detector's 12:00–24:00 IST window is shown.
+- Hourly schedule was 13:05–01:05 IST (cron minute in UTC); now 12:35–00:35 IST as designed.
+- Hero panel: PM2.5 now counts only the fires GK-2A saw (the old figure mixed in VIIRS-only fires with an assumed
+  midday profile); a note gives the VIIRS-only count; the share is withheld when fewer than 5 fires were seen for
+  30 min or more. Fires seen in one image are labelled unconfirmed. Times past the night's date show the weekday.
+- `missed_harm_share` counted counted fires too; fixed. The assistant gets the same rules as the page.
+- Briefing PDF: 404 for a date with no data; town table lists only towns the smoke reaches.
+- 81 of 94 replay nights had been published by an older model version; all 94 re-run with the current code, using
+  the cached season ERA5 (identical fields, no API calls).

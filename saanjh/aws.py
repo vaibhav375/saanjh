@@ -16,6 +16,7 @@ import shutil
 from datetime import datetime, timedelta, timezone
 
 import boto3
+from botocore.exceptions import ClientError
 import numpy as np
 import pandas as pd
 
@@ -69,6 +70,14 @@ def _base(day):
         return bias, noise
 
 
+def _exists(key):
+    try:
+        s3.head_object(Bucket=BUCKET, Key=key)
+        return True
+    except ClientError:
+        return False
+
+
 def _detect(t):
     if not 12 <= (t + pipeline.IST).hour <= 23:
         return None
@@ -94,6 +103,9 @@ def detect_handler(event, _ctx=None):
             if m:  # either band may land first; the second one's message does the work
                 import time as _t
                 t = datetime.strptime(m.group(2), "%Y%m%d%H%M")
+                if _exists(f"detections/{t:%Y%m%d}/{t:%H%M}.csv"):
+                    continue  # both bands' messages can arrive after both files exist; the first one did the work
+                # ponytail: check-then-write, so two concurrent invocations can still both run; harmless, rare
                 t0 = _t.time()
                 d = _detect(t)
                 if d is not None:
@@ -143,6 +155,15 @@ def model_handler(event, _ctx=None):
     step = int(np.median(np.diff(np.sort(det.t.unique()))) / np.timedelta64(1, "m")) if det.t.nunique() > 1 else 60
     viirs = _viirs(day, replay)
     ev = pipeline.fire_events(day, step_min=step, viirs=viirs, detections=det)
+    if replay:  # the season's ERA5 lives in S3; slicing it saves ~350 Open-Meteo calls per replayed night
+        name = f"era5w_{day.year}1013_{day.year}1203.npz"
+        local = os.path.join(os.environ["SAANJH_DATA"], "met", name)
+        if not os.path.exists(local):
+            os.makedirs(os.path.dirname(local), exist_ok=True)
+            try:
+                s3.download_file(BUCKET, f"met/{name}", local)
+            except ClientError:
+                pass  # falls back to the API
     met = smoke.Met.era5(day - timedelta(days=1), day + timedelta(days=2), forecast=not replay)
     ranked, towns, conc, t0 = pipeline.tonight(day, met, ev, viirs=viirs)
     out = pipeline.summary(day, ranked, towns, conc, t0, n_scans, replay, events=ev)
@@ -297,6 +318,7 @@ def _status():
         Id=i, MetricStat=dict(Metric=dict(Namespace=ns, MetricName=name, Dimensions=[dict(Name=k, Value=v) for k, v in dims.items()]),
                               Period=period, Stat=stat), ReturnData=True)
     fns = {k: os.environ.get(k, "") for k in ("DETECT_FN", "MODEL_FN", "PLAN_FN", "AGENT_FN")}
+    fns["SITE_FN"] = os.environ.get("AWS_LAMBDA_FUNCTION_NAME", "")  # this function: the page and API
     queries = [q("scans", "Saanjh", "ScansProcessed", "Sum", {"Stage": "live"}),
                q("dets", "Saanjh", "Detections", "Sum", {"Stage": "live"}),
                q("lat", "Saanjh", "ScanLatency", "p50", {"Stage": "live"}, 3 * 3600),
@@ -307,22 +329,25 @@ def _status():
                         q(f"dur_{k.lower()}", "AWS/Lambda", "Duration", "Sum", {"FunctionName": fn}),
                         q(f"inv_{k.lower()}", "AWS/Lambda", "Invocations", "Sum", {"FunctionName": fn})]
     res = cw.get_metric_data(MetricDataQueries=queries, StartTime=now - timedelta(days=1), EndTime=now)
-    val = {r["Id"]: (r["Values"][0] if r["Values"] else 0.0) for r in res["MetricDataResults"]}
-    mem = {"DETECT_FN": 2048, "MODEL_FN": 3008, "PLAN_FN": 3008, "AGENT_FN": 512}
+    # Sums can come back split across two daily buckets: add them up. Percentiles: the latest bucket.
+    val = {r["Id"]: (r["Values"][0] if r["Id"] in ("lat", "proc") else sum(r["Values"])) if r["Values"] else 0.0
+           for r in res["MetricDataResults"]}
+    mem = {"DETECT_FN": 2048, "MODEL_FN": 3008, "PLAN_FN": 3008, "AGENT_FN": 512, "SITE_FN": 512}
     gbs = sum(val.get(f"dur_{k.lower()}", 0) / 1000 * mem[k] / 1024 for k in fns)
     keys = [o for d in (now - timedelta(days=1), now) for p in s3.get_paginator("list_objects_v2").paginate(
             Bucket=BUCKET, Prefix=f"detections/{d:%Y%m%d}/") for o in p.get("Contents", [])]
-    recent = [o for o in keys if o["LastModified"] > now - timedelta(days=1)]
+    image_t = lambda k: datetime.strptime(k[11:19] + k[20:24], "%Y%m%d%H%M").replace(tzinfo=timezone.utc)
+    recent = {o["Key"] for o in keys if image_t(o["Key"]) > now - timedelta(days=1)}  # unique images, not messages
     last = max((o["Key"] for o in keys), default=None)
     alarms = cw.describe_alarms(AlarmNamePrefix="saanjh-")["MetricAlarms"]
     body = dict(
         generated=f"{now:%Y-%m-%dT%H:%MZ}",
         last_image=f"{last[11:15]}-{last[15:17]}-{last[17:19]}T{last[20:22]}:{last[22:24]}:00Z" if last else None,
-        images_24h=max(int(val["scans"]), len(recent)), detections_24h=int(val["dets"]),
+        images_24h=len(recent), detections_24h=int(val["dets"]),
         latency_p50_min=round(val["lat"] / 60, 1), process_p50_s=round(val["proc"], 1),
         invocations_24h=int(sum(val.get(f"inv_{k.lower()}", 0) for k in fns)),
         errors_24h=int(sum(val.get(f"err_{k.lower()}", 0) for k in fns)),
-        lambda_cost_24h_usd=round(gbs * 0.0000133334 + val.get("inv_detect_fn", 0) * 2e-7, 3),
+        lambda_cost_24h_usd=round(gbs * 0.0000133334 + sum(val.get(f"inv_{k.lower()}", 0) for k in fns) * 2e-7, 3),  # arm64 prices
         alarms=[dict(name=a["AlarmName"].replace("saanjh-", ""), state=a["StateValue"]) for a in alarms])
     _STATUS.update(at=_t.time(), body=body)
     return body
@@ -346,6 +371,8 @@ def _briefing(name, day):
             return None
     d8 = day.replace("-", "") if ok_day else ""
     night, plan = get("tonight.json", f"results/{d8}.json"), get("plan.json", f"results/plan_{d8}.json")
+    if night is None and plan is None:
+        return dict(statusCode=404, headers={"Content-Type": "text/plain"}, body="No data for that day")
     if night:
         night.pop("frames", None)
     pdf = briefing.build(D["geo"]["features"][k], night, plan, D["districts"][k])

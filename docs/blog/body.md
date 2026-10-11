@@ -68,7 +68,7 @@ Seeing the evening fires helps only if someone can act on them. Saanjh adds thre
 
 - **A noon plan.** A gradient-boosted fire-risk model (ROC AUC 0.90 on 2025) is combined with where each area's smoke would travel to give an expected-harm map by 11:30. Twenty field teams placed on it cover 75% of that evening's smoke harm, against 31% for teams sent to yesterday's counted fires.
 - **Town notices.** Each town gets the hour farm smoke arrives, its peak, the chance of passing 25 µg/m³ across the weather scenarios, which fires sent it, and a notice in English, Hindi or Punjabi.
-- **District accountability.** For each of 43 districts, Saanjh sets the official count against the fire energy GK-2A saw. From 2024 to 2025, Sangrur's count fell 69% while its fire energy rose 15%; Bathinda's fell 59% while energy rose 55%. Officers can download a one-page briefing for their district.
+- **District accountability.** For each of 43 districts, Saanjh sets the official count against the fire energy GK-2A saw. From 2024 to 2025, Sangrur's count fell 69% while its fire energy rose 15%; Bathinda's fell 59% while energy rose 55%. Counting only fires seen for 30 minutes or more, the rise holds in both. Officers can download a one-page briefing for their district.
 
 *[Insert image: `town.png`. Caption: Moga on 10 November 2025: farm smoke from 17:00, and the fires it comes from.]*
 

@@ -108,7 +108,7 @@ satellite pass and when each fire was first seen. A short tour walks a first-tim
   25 µg/m³, which fires and which state the smoke came from, and a notice in English, Hindi or Punjabi.
 - **Teams**, the noon plan, with the fires that actually burned that evening overlaid on replays.
 - **Districts**, two seasons of official counts set against the fire energy GK-2A saw. Sangrur's count fell 69%
-  from 2024 to 2025 while the energy rose 15%; Bathinda −59% and +55%. Each district has a printable briefing for
+  from 2024 to 2025 while the energy rose 15%; Bathinda −59% and +55%. The rise holds counting only fires seen for 30 minutes or more. Each district has a printable briefing for
   tonight.
 
 Saanjh works on a 2–4 km grid and never identifies farmers or plots.

@@ -29,6 +29,9 @@ FINDINGS = """Measured by Saanjh (Punjab + Haryana, 15 Oct - 30 Nov, every 10-mi
   1.9x at 400 m), because the boundary layer collapses from ~1 km to tens of metres after sunset; worse on all 47 days.
 - Adding the missed fires to today's overpass inventory raises the day-to-day correlation of modelled smoke with
   measured PM2.5 near the fires from 0.23 to 0.28 (2025, 95% CI +0.02 to +0.10); no change in Delhi.
+- A second satellite confirms the evening fires: evening fires GK-2A saw for 30 min or more show up in the ~01:30
+  VIIRS night pass 3.0x as often as the same places on other nights (95% CI 1.8-4.7). Fires seen in a single
+  10-minute image are NOT confirmed; without them the 2025 share is 89.5% (2024: 83.0%).
 - A night-before smoke warning does not beat 'tomorrow will be like today' for predicting bad mornings.
 - Noon team plan (2025 held out): 20 field teams placed by expected smoke harm cover 75% of that evening's smoke
   harm, vs 31% when teams chase the previous day's officially counted fires. Fire-risk model ROC AUC 0.90.
@@ -45,7 +48,11 @@ When asked why a fire ranks where it does, call get_fire and explain from its ti
 of exposure, and mention that evening smoke is trapped in a shallow night-time layer if relevant.
 Never compare a fire with others ("highest", "largest") unless you have called get_fire for those others too.
 Never identify or speculate about individual farmers or plots; the grid is 2-4 km. If the data cannot answer,
-say so. Model smoke values are estimates of the farm-fire share only, not total pollution."""
+say so. Model smoke values are estimates of the farm-fire share only, not total pollution.
+If the night summary's `confirmed` is under 5, say there are too few confirmed fires (seen for 30 minutes or more)
+to give a reliable missed share yet; do not headline the percentage.
+Times carry a weekday (e.g. "Tue 06:00"); when it is not the night's own date, keep it and say it is the next
+morning or day. Fires only VIIRS saw are modelled as burning around midday: never call their smoke evening smoke."""
 
 
 def _load(day=None):
@@ -79,11 +86,18 @@ def make_agent(day=None):
 
     @tool
     def get_night_summary() -> dict:
-        """Tonight's totals: fire events seen, how many were burning when the polar satellites passed, share of
-        fire energy the official count missed, PM2.5 released, and the date."""
+        """Tonight's totals and the date. events: fires GK-2A saw; counted: of those, burning and seen by VIIRS at
+        the ~13:30 pass; uncounted_energy_share: share of GK-2A fire energy from fires the count missed;
+        confirmed: fires seen for 30 min or more (if under 5, say the share is not yet reliable);
+        pm25_gk_t: tonnes of PM2.5 from the fires GK-2A saw; viirs_only: small fires VIIRS counted that GK-2A
+        could not see; pm25_t: PM2.5 from all fires in the smoke model, including those VIIRS-only fires (assumed
+        to burn through the middle of the day); missed_harm_share: share of smoke exposure from uncounted fires."""
         d = _load(day)
-        return {"day": d["day"], "replay": d.get("replay", False), **{k: v for k, v in d["stats"].items()
-                                                                       if k not in ("harm_total", "first_seen")}}
+        st = {k: v for k, v in d["stats"].items() if k not in ("harm_total", "first_seen")}
+        if st.get("confirmed", 99) < 5:  # same rule as the page: no headline share from unconfirmed fires
+            st.pop("uncounted_energy_share", None)
+            st["note"] = "Too few fires confirmed (seen for 30 min or more) to give a missed share yet."
+        return {"day": d["day"], "replay": d.get("replay", False), **st}
 
     @tool
     def get_town(name: str) -> dict:
