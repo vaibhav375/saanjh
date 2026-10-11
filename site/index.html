@@ -605,13 +605,13 @@ async function loadDays() {
   } catch (e) { for (const x of ["2025-11-10", "2024-11-18"]) sel.insertAdjacentHTML("beforeend", `<option value="${x}">${x}</option>`); }
   if (S.day && ![...sel.options].some((o) => o.value === S.day)) sel.insertAdjacentHTML("beforeend", `<option value="${S.day}">${S.day}</option>`);
   sel.value = S.day;
-  sel.addEventListener("change", () => { const u = new URL(location); sel.value ? u.searchParams.set("day", sel.value) : u.searchParams.delete("day"); location.href = u; });
+  sel.addEventListener("change", () => { const u = new URL(location); if (sel.value) { u.searchParams.set("day", sel.value); u.searchParams.delete("live"); } else { u.searchParams.delete("day"); u.searchParams.set("live", "1"); } location.href = u; });
 }
 const frameTime = (k) => Date.parse(S.d.grid.t0) + k * 3600e3;
 async function load() {
   loadDays();
   let [d, borders] = await Promise.all([getJSON(qs("tonight.json")), getJSON("borders.json")]);
-  if (!S.day && (d.stats.events || 0) < QUIET) { // early or late in the season the live night can be nearly empty
+  if (!S.day && !Q.has("live") && (d.stats.events || 0) < QUIET) { // early or late in the season the live night can be nearly empty
     S.day = SHOWCASE; d = await getJSON(qs("tonight.json")); $("#day").value = SHOWCASE;
     setTimeout(() => toast(`A quiet night so far, so you're seeing ${new Date(SHOWCASE).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}, a peak night. Pick "Live · tonight" to switch back.`), 3600);
   }
