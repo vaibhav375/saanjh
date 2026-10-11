@@ -1,13 +1,15 @@
 # Builder Center post
 
-**Title:** How farmers outran the satellites, and how a Korean weather satellite on AWS caught up
+**Title:** After the Satellites Pass: Catching North India's Evening Farm Fires with GK-2A on AWS
 
-**Description:** India counts farm fires with satellites that pass at 1:30 pm, but farmers now burn at 5. Saanjh reads every 10-minute GK-2A image on AWS to find the evening fires, follow their smoke to towns, and place field teams before the fires are lit.
+**Description:** India's farm-fire count comes from satellites that pass at 1:30 pm, but farmers now burn at 5. Here's how I used GK-2A on AWS to catch the evening fires, follow their smoke to towns, and plan prevention before dusk.
 
 **Body:** `body.md` (paste as Markdown)
 
 **Cover image:** `cover.jpg` (1600×900; `cover.png` is the lossless copy)
 
 **Tags:** aws, serverless, aws-lambda, amazon-bedrock, aws-step-functions, open-data, sustainability, air-quality
+
+**Images in the body:** upload `evening_fires.png`, `architecture.png` and `town.png` where the body says *[Insert image: …]*, then delete those lines.
 
 **URL:** https://github.com/vaibhav375/saanjh
