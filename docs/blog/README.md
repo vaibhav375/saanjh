@@ -2,7 +2,7 @@
 
 **Title:** After the Satellites Pass: Tracking Farm Fires on AWS
 
-**Description:** India's farm-fire count comes from satellites that pass at 1:30 pm, but farmers now burn at 5. Here's how I used GK-2A on AWS to catch the evening fires, follow their smoke to towns, and plan prevention before dusk.
+**Description:** India counts farm fires at the 1:30 pm satellite pass, but farmers now burn at 5. How I used GK-2A on AWS to catch the evening fires and track their smoke.
 
 **Body:** `body.md` (paste as Markdown)
 
