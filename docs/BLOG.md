@@ -1,4 +1,4 @@
-# After the Satellites Pass: Catching North India's Evening Farm Fires with GK-2A on AWS
+# After the Satellites Pass: Tracking Farm Fires on AWS
 
 *Draft for AWS Builder Center. Built during Environmental Hacks (AWS × WeMakeDevs), October 2026.*
 
