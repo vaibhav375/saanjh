@@ -32,6 +32,7 @@ system that study calls for:
 | Strong hotspots, same day | **2** at the 13:40 IST overpass vs **70–78** at 16:00–16:30 IST |
 | The dusk penalty, 47 days | The same fire lit at 17:00 instead of 13:00 causes **2.8×** the population smoke exposure (200 m plume floor; 1.9× at 400 m), and is worse on all 47 days |
 | Fire energy missed by the overpass, 2025 (held out) | **91.7%** of 729 TJ detected, with the detector frozen on 2024 |
+| Independent check: VIIRS night pass (~01:30 IST) | Evening fires seen ≥ 30 min (61% of missed energy) confirmed **3.0×** as often as the same places on other nights; headline without unconfirmed single-image detections: 89.5% / 83.0% |
 | Does it explain measured pollution? (2025 held out, CPCB stations) | Adding the missed fires to the existing overpass inventory raises the season's daily correlation with PM2.5 near the fires from 0.23 to 0.28 (+0.06, 95% CI +0.02 to +0.10); no change in Delhi |
 | GK-2A detection vs VIIRS at overpass, 2025 held out | 3% of fires under 5 MW, 24% at 20–40 MW, 43% at 40–80 MW (same curve as 2024); 70% of detections have a VIIRS fire within one pixel |
 | **Send teams before dusk** (2025 held out) | A noon plan placing 20 field teams by expected smoke harm covers **75%** of that evening's smoke harm, vs **31%** chasing the previous day's officially counted fires (fire-risk model ROC AUC 0.90) |

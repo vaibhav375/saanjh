@@ -1,0 +1,114 @@
+{
+ "radius_km": 5.0,
+ "sources": [
+  "VIIRS_SNPP_SP",
+  "VIIRS_NOAA20_SP",
+  "VIIRS_NOAA21_NRT"
+ ],
+ "nights": 94,
+ "weighting": "fire radiative energy",
+ "groups": {
+  "Evening, first seen >=14 IST": {
+   "n": 51203,
+   "energy_share": 1.0,
+   "night": 0.0165,
+   "same_place": 0.0062,
+   "random_farm": 0.0119,
+   "lift_same_place": 2.67,
+   "ci_same_place": [
+    1.71,
+    3.8
+   ],
+   "lift_random": 1.38,
+   "ci_random": [
+    0.92,
+    1.92
+   ]
+  },
+  "seen in >=3 scans (30 min)": {
+   "n": 12181,
+   "energy_share": 0.611,
+   "night": 0.0216,
+   "same_place": 0.0071,
+   "random_farm": 0.0128,
+   "lift_same_place": 3.05,
+   "ci_same_place": [
+    1.83,
+    4.7
+   ],
+   "lift_random": 1.69,
+   "ci_random": [
+    1.02,
+    2.56
+   ]
+  },
+  "seen in >=6 scans (1 h)": {
+   "n": 3108,
+   "energy_share": 0.296,
+   "night": 0.0314,
+   "same_place": 0.0092,
+   "random_farm": 0.0126,
+   "lift_same_place": 3.41,
+   "ci_same_place": [
+    1.92,
+    5.42
+   ],
+   "lift_random": 2.49,
+   "ci_random": [
+    1.34,
+    4.34
+   ]
+  },
+  "first seen >=18 IST": {
+   "n": 1721,
+   "energy_share": 0.014,
+   "night": 0.1293,
+   "same_place": 0.0373,
+   "random_farm": 0.0111,
+   "lift_same_place": 3.46,
+   "ci_same_place": [
+    2.55,
+    4.83
+   ],
+   "lift_random": 11.65,
+   "ci_random": [
+    6.73,
+    21.22
+   ]
+  },
+  "single scan": {
+   "n": 29123,
+   "energy_share": 0.222,
+   "night": 0.0081,
+   "same_place": 0.0049,
+   "random_farm": 0.0117,
+   "lift_same_place": 1.67,
+   "ci_same_place": [
+    1.31,
+    2.12
+   ],
+   "lift_random": 0.69,
+   "ci_random": [
+    0.54,
+    0.88
+   ]
+  },
+  "Counted by VIIRS at 13:30": {
+   "n": 3137,
+   "energy_share": 0.123,
+   "night": 0.0266,
+   "same_place": 0.007,
+   "random_farm": 0.0199,
+   "lift_same_place": 3.77,
+   "ci_same_place": [
+    1.9,
+    6.46
+   ],
+   "lift_random": 1.34,
+   "ci_random": [
+    0.56,
+    3.08
+   ]
+  }
+ }
+}

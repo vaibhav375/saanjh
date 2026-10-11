@@ -43,5 +43,12 @@ ev["planner"] = rows
 al = pd.read_csv("results/alert_replay_2025.csv")
 ev["alerts"] = [dict(method=r.method, heidke=round(r.heidke, 3), hit=round(r.hit_rate, 3)) for r in al.itertuples()]
 
+nc = json.load(open("results/night_check.json"))
+e = pd.read_csv("data/night_events.csv")
+m = e.scans >= 3
+ev["night"] = dict(groups=nc["groups"], nights=nc["nights"], radius_km=nc["radius_km"],
+                   missed_share_3scans={str(y): round(float(g.fre_mj[(g.group != "counted") & m[g.index]].sum() / g.fre_mj[m[g.index]].sum()), 3)
+                                        for y, g in e.groupby("year")})
+
 json.dump(ev, open("site/evidence.json", "w"), separators=(",", ":"))
 print({k: (len(v) if isinstance(v, list) else list(v)) for k, v in ev.items()})

@@ -246,3 +246,30 @@ Every GK-2A fire event of both seasons and every VIIRS fire behind the official 
 GK-2A saw rose. Examples: Sangrur count −69%, energy +15%; Bathinda −59% / +55%; Fazilka −36% / +58%;
 Mansa −67% / +45%. Caveat: district energy inherits GK-2A's limits (small fires missed; ~30% of detections
 unmatched by VIIRS on the held-out season), so district numbers are indicative.
+
+## N7: a second satellite at night (`scripts/night_check.py`, both seasons, 94 nights)
+
+Independent check of the evening fires. VIIRS on S-NPP, NOAA-20 and NOAA-21 passes again at ~01:00–03:00 IST.
+For every GK-2A fire event, is there a VIIRS night fire within 5 km that night? Two baselines: the same place on
+the season's other nights (controls for villages that burn every night) and random farmland on the same night
+(controls for how busy the night was). Shares are weighted by fire radiative energy; 95% CIs bootstrap over nights.
+
+| GK-2A fires | Events | Share of evening energy | Night hit | Same place, other nights | Random farmland | Lift (same place) | Lift (random) |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Evening (first seen ≥ 14:00 IST) | 51,203 | 100% | 1.7% | 0.6% | 1.2% | 2.7 [1.7, 3.8] | 1.4 [0.9, 1.9] |
+| … seen in ≥ 3 images (30 min) | 12,181 | 61% | 2.2% | 0.7% | 1.3% | **3.0 [1.8, 4.7]** | **1.7 [1.0, 2.6]** |
+| … seen in ≥ 6 images (1 h) | 3,108 | 30% | 3.1% | 0.9% | 1.3% | **3.4 [1.9, 5.4]** | **2.5 [1.3, 4.3]** |
+| … first seen ≥ 18:00 IST | 1,721 | 1% | 12.9% | 3.7% | 1.1% | **3.5 [2.6, 4.8]** | **11.7 [6.7, 21]** |
+| … single image only | 29,123 | 22% | 0.8% | 0.5% | 1.2% | 1.7 [1.3, 2.1] | 0.7 [0.5, 0.9] |
+| Reference: counted by VIIRS at 13:30 | 3,137 | — | 2.7% | 0.7% | 2.0% | 3.8 [1.9, 6.5] | 1.3 [0.6, 3.1] |
+
+Reading: stubble fires burn out within hours, so even fires VIIRS itself confirmed at 13:30 rarely show at 01:30
+(2.7%); the test has power only through the gap over chance. Evening fires seen for 30 minutes or more (61% of the
+missed energy) beat both baselines, about as strongly as the confirmed 13:30 fires do. Single-image detections are
+not confirmed (below the random-farmland rate): treat them as unverified. Dropping them, the share of fire energy
+from fires that started after the overpass is **89.5% (2025) and 83.0% (2024)**, against 91.7% and 86.8% with them:
+the headline does not depend on the unconfirmed detections.
+
+Bounds: GK-2A misses most fires under ~10 MW at every hour (N2), so the missed energy in TJ and tonnes of PM2.5 is a
+floor. The missed *share* is not a strict bound (small fires are missed at 13:30 too); it assumes small fires are
+spread over the afternoon like large ones.

@@ -19,5 +19,5 @@ def test_inline_script_parses(tmp_path):
 
 def test_page_has_the_views():
     s = open(PAGE, encoding="utf-8").read()
-    for el in ('id="map"', 'id="t-towns"', 'id="t-fires"', 'id="t-teams"', 'id="horizon"', 'id="sheet"', "maplibre-gl@5.6.0"):
+    for el in ('id="map"', 'id="t-towns"', 'id="t-fires"', 'id="t-teams"', 'id="horizon"', 'id="sheet"', 'id="t-dist"', 'id="open-ev"', 'id="tour"', "maplibre-gl@5.6.0"):
         assert el in s
