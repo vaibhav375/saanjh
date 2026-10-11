@@ -91,7 +91,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ink-3); flex: none; }
 .live-dot.on { background: #6BD39A; animation: ping 2s infinite; }
 @keyframes ping { 0% { box-shadow: 0 0 0 0 rgba(107,211,154,.55); } 70% { box-shadow: 0 0 0 9px rgba(107,211,154,0); } 100% { box-shadow: 0 0 0 0 rgba(107,211,154,0); } }
-.search { flex: 1; max-width: 360px; height: 54px; display: flex; align-items: center; gap: 10px; padding: 0 14px; margin-left: auto; }
+.search { flex: 1 1 140px; min-width: 0; max-width: 360px; height: 54px; display: flex; align-items: center; gap: 10px; padding: 0 14px; margin-left: auto; }
 .search svg { flex: none; opacity: .7; }
 .search input { flex: 1; min-width: 0; background: transparent; border: 0; color: var(--ink); font: 500 14px var(--text); }
 .search input::placeholder { color: var(--ink-3); }
@@ -275,6 +275,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 .ev.wide { grid-column: 1 / -1; }
+@media (max-width: 1440px) { #systxt span { display: none; } }
+@media (max-width: 1280px) { .btn-ev span, .brand p { display: none; } .btn-ev { padding: 0 16px; } }
 .tour { position: fixed; z-index: 60; left: 446px; bottom: 112px; width: min(440px, calc(100vw - 32px)); padding: 18px 20px 14px; animation: rise .4s var(--ease) both; }
 .tour[hidden] { display: none; }
 .tour-step { font: 500 11px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--dusk); }
@@ -319,7 +321,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     <input id="q" list="townlist" placeholder="Find a town — Ludhiana, Delhi, Sirsa…" autocomplete="off" aria-label="Find a town">
     <datalist id="townlist"></datalist>
   </div>
-  <button class="btn-ev glass" id="open-ev" type="button" aria-haspopup="dialog">
+  <button class="btn-ev glass" id="open-ev" type="button" aria-haspopup="dialog" aria-label="How we know it works">
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/></svg>
     <span>How we know it works</span>
   </button>
